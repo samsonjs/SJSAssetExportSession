@@ -25,11 +25,11 @@ public final class ExportSession {
         }
     }
 
-    public func export(
+    public static func export(
         asset: sending AVAsset,
         audioMix: sending AVAudioMix?,
         audioOutputSettings: [String: (any Sendable)],
-        videoComposition: sending AVVideoComposition?,
+        videoComposition: sending AVVideoComposition,
         videoOutputSettings: [String: (any Sendable)],
         timeRange: CMTimeRange? = nil,
         optimizeForNetworkUse: Bool = false,

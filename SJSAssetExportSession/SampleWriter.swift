@@ -6,6 +6,9 @@
 //
 
 import AVFoundation.AVAsset
+import OSLog
+
+private let log = Logger(subsystem: "SJSAssetExportSession", category: "SampleWriter")
 
 private extension AVAsset {
     func sendTracks(withMediaType mediaType: AVMediaType) async throws -> sending [AVAssetTrack] {
@@ -24,25 +27,21 @@ actor SampleWriter {
         queue.asUnownedSerialExecutor()
     }
 
-    let audioTracks: [AVAssetTrack]
+    private let audioMix: AVAudioMix?
 
-    let audioMix: AVAudioMix?
+    private let audioOutputSettings: [String: (any Sendable)]
 
-    let audioOutputSettings: [String: (any Sendable)]
+    private let videoComposition: AVVideoComposition?
 
-    let videoTracks: [AVAssetTrack]
+    private let videoOutputSettings: [String: (any Sendable)]
 
-    let videoComposition: AVVideoComposition?
+    private let reader: AVAssetReader
 
-    let videoOutputSettings: [String: (any Sendable)]
+    private let writer: AVAssetWriter
 
-    let reader: AVAssetReader
+    private let duration: CMTime
 
-    let writer: AVAssetWriter
-
-    let duration: CMTime
-
-    let timeRange: CMTimeRange
+    private let timeRange: CMTimeRange
 
     private var audioOutput: AVAssetReaderAudioMixOutput?
 
@@ -52,14 +51,18 @@ actor SampleWriter {
 
     private var videoInput: AVAssetWriterInput?
 
-    private var pixelBufferAdaptor: AVAssetWriterInputPixelBufferAdaptor?
+    private lazy var progressStream: AsyncStream<Float> = AsyncStream { continuation in
+        progressContinuation = continuation
+    }
+
+    private var progressContinuation: AsyncStream<Float>.Continuation?
 
     init(
         asset: sending AVAsset,
         timeRange: CMTimeRange,
         audioMix: AVAudioMix?,
         audioOutputSettings: sending [String: (any Sendable)],
-        videoComposition: AVVideoComposition?,
+        videoComposition: AVVideoComposition,
         videoOutputSettings: sending [String: (any Sendable)],
         optimizeForNetworkUse: Bool,
         outputURL: URL,
@@ -81,26 +84,31 @@ actor SampleWriter {
             throw ExportSession.Error.setupFailure(reason: "Cannot apply video output settings")
         }
 
-        self.audioTracks = try await asset.sendTracks(withMediaType: .audio)
+        let audioTracks = try await asset.sendTracks(withMediaType: .audio)
+        let videoTracks = try await asset.sendTracks(withMediaType: .video)
+
         self.audioMix = audioMix
         self.audioOutputSettings = audioOutputSettings
-        self.videoTracks = try await asset.sendTracks(withMediaType: .video)
         self.videoComposition = videoComposition
         self.videoOutputSettings = videoOutputSettings
         self.reader = reader
         self.writer = writer
         self.duration = duration
         self.timeRange = timeRange
+
+        try setUpAudio(audioTracks: audioTracks)
+        try setUpVideo(videoTracks: videoTracks)
     }
 
     func writeSamples() async throws {
+        progressContinuation?.yield(0)
+
         writer.startWriting()
         reader.startReading()
         writer.startSession(atSourceTime: timeRange.start)
 
-        async let audioResult = try encodeAudioTracks(audioTracks)
-        async let videoResult = try encodeVideoTracks(videoTracks)
-        _ = try await (audioResult, videoResult)
+        await encodeAudioTracks()
+        await encodeVideoTracks()
 
         if reader.status == .cancelled || writer.status == .cancelled {
             throw CancellationError()
@@ -119,10 +127,12 @@ actor SampleWriter {
         }
     }
 
-    private func encodeAudioTracks(_ audioTracks: [AVAssetTrack]) async throws -> Bool {
-        guard !audioTracks.isEmpty else { return false }
+    private func setUpAudio(audioTracks: [AVAssetTrack]) throws {
+        guard !audioTracks.isEmpty else { return }
 
         let audioOutput = AVAssetReaderAudioMixOutput(audioTracks: audioTracks, audioSettings: nil)
+        audioOutput.alwaysCopiesSampleData = false
+        audioOutput.audioMix = audioMix
         guard reader.canAdd(audioOutput) else {
             throw ExportSession.Error.setupFailure(reason: "Can't add audio output to reader")
         }
@@ -130,55 +140,23 @@ actor SampleWriter {
         self.audioOutput = audioOutput
 
         let audioInput = AVAssetWriterInput(mediaType: .audio, outputSettings: audioOutputSettings)
+        audioInput.expectsMediaDataInRealTime = false
         guard writer.canAdd(audioInput) else {
             throw ExportSession.Error.setupFailure(reason: "Can't add audio input to writer")
         }
         writer.add(audioInput)
         self.audioInput = audioInput
-
-        return await withCheckedContinuation { continuation in
-            self.audioInput?.requestMediaDataWhenReady(on: queue) {
-                let hasMoreSamples = self.assumeIsolated { $0.writeReadyAudioSamples() }
-                if !hasMoreSamples {
-                    continuation.resume(returning: true)
-                }
-            }
-        }
     }
 
-    private func writeReadyAudioSamples() -> Bool {
-        guard let audioOutput, let audioInput else { return true }
-
-        while audioInput.isReadyForMoreMediaData {
-            guard reader.status == .reading && writer.status == .writing,
-                  let sampleBuffer = audioOutput.copyNextSampleBuffer() else {
-                audioInput.markAsFinished()
-                NSLog("Finished encoding ready audio samples from \(audioOutput)")
-                return false
-            }
-
-            guard audioInput.append(sampleBuffer) else {
-                NSLog("Failed to append audio sample buffer \(sampleBuffer) to input \(audioInput)")
-                return false
-            }
+    private func setUpVideo(videoTracks: [AVAssetTrack]) throws {
+        guard !videoTracks.isEmpty else {
+            throw ExportSession.Error.setupFailure(reason: "No video tracks")
         }
 
-        // Everything was appended successfully, return true indicating there's more to do.
-        NSLog("Completed encoding ready audio samples, more to come...")
-        return true
-    }
-
-    private func encodeVideoTracks(_ videoTracks: [AVAssetTrack]) async throws -> Bool {
-        guard !videoTracks.isEmpty else { return false }
-
-        guard let width = videoComposition.map({ Int($0.renderSize.width) })
-                ?? (videoOutputSettings[AVVideoWidthKey] as? NSNumber)?.intValue,
-              let height = videoComposition.map({ Int($0.renderSize.height) })
-                ?? (videoOutputSettings[AVVideoHeightKey] as? NSNumber)?.intValue else {
-            throw ExportSession.Error.setupFailure(reason: "Export dimensions must be provided in a video composition or video output settings")
-        }
-
-        let videoOutput = AVAssetReaderVideoCompositionOutput(videoTracks: videoTracks, videoSettings: nil)
+        let videoOutput = AVAssetReaderVideoCompositionOutput(
+            videoTracks: videoTracks,
+            videoSettings: nil
+        )
         videoOutput.alwaysCopiesSampleData = false
         videoOutput.videoComposition = videoComposition
         guard reader.canAdd(videoOutput) else {
@@ -188,72 +166,60 @@ actor SampleWriter {
         self.videoOutput = videoOutput
 
         let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoOutputSettings)
+        videoInput.expectsMediaDataInRealTime = false
         guard writer.canAdd(videoInput) else {
             throw ExportSession.Error.setupFailure(reason: "Can't add video input to writer")
         }
         writer.add(videoInput)
         self.videoInput = videoInput
-
-        let pixelBufferAttributes: [String: Any] = [
-            kCVPixelBufferPixelFormatTypeKey as String: NSNumber(integerLiteral: Int(kCVPixelFormatType_32RGBA)),
-            kCVPixelBufferWidthKey as String: NSNumber(integerLiteral: width),
-            kCVPixelBufferHeightKey as String: NSNumber(integerLiteral: height),
-            "IOSurfaceOpenGLESTextureCompatibility": NSNumber(booleanLiteral: true),
-            "IOSurfaceOpenGLESFBOCompatibility": NSNumber(booleanLiteral: true),
-        ]
-        pixelBufferAdaptor = AVAssetWriterInputPixelBufferAdaptor(
-            assetWriterInput: videoInput,
-            sourcePixelBufferAttributes: pixelBufferAttributes
-        )
-
-        return await withCheckedContinuation { continuation in
-            self.videoInput?.requestMediaDataWhenReady(on: queue) {
-                let hasMoreSamples = self.assumeIsolated { $0.writeReadyVideoSamples() }
-                if !hasMoreSamples {
-                    continuation.resume(returning: true)
-                }
-            }
-        }
     }
 
-    private func writeReadyVideoSamples() -> Bool {
-        guard let videoOutput, let videoInput, let pixelBufferAdaptor else { return true }
-
-        while videoInput.isReadyForMoreMediaData {
+    private func writeReadySamples(output: AVAssetReaderOutput, input: AVAssetWriterInput) -> Bool {
+        while input.isReadyForMoreMediaData {
             guard reader.status == .reading && writer.status == .writing,
-                  let sampleBuffer = videoOutput.copyNextSampleBuffer() else {
-                videoInput.markAsFinished()
-                NSLog("Finished encoding ready video samples from \(videoOutput)")
+                  let sampleBuffer = output.copyNextSampleBuffer() else {
+                input.markAsFinished()
+                log.debug("Finished encoding ready audio samples from \(output)")
                 return false
             }
 
-            let samplePresentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer) - timeRange.start
-            let progress = Float(samplePresentationTime.seconds / duration.seconds)
-#warning("TODO: publish progress to an AsyncStream")
-
-            guard let pixelBufferPool = pixelBufferAdaptor.pixelBufferPool else {
-                NSLog("No pixel buffer pool available on adaptor \(pixelBufferAdaptor)")
+            guard input.append(sampleBuffer) else {
+                log.error("""
+                    Failed to append audio sample buffer \(String(describing: sampleBuffer)) to
+                    input \(input.debugDescription)
+                """)
                 return false
-            }
-            var toRenderBuffer: CVPixelBuffer?
-            let result = CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, pixelBufferPool, &toRenderBuffer)
-            var handled = false
-            if result == kCVReturnSuccess, let toBuffer = toRenderBuffer {
-                handled = pixelBufferAdaptor.append(toBuffer, withPresentationTime: samplePresentationTime)
-                if !handled { return false }
-            }
-            if !handled {
-#warning("is this really necessary?! seems like a failure scenario...")
-                guard videoInput.append(sampleBuffer) else {
-                    NSLog("Failed to append video sample buffer \(sampleBuffer) to input \(videoInput)")
-                    return false
-                }
             }
         }
 
         // Everything was appended successfully, return true indicating there's more to do.
-        NSLog("Completed encoding ready video samples, more to come...")
+        log.debug("Completed encoding ready audio samples, more to come...")
         return true
     }
 
+    private func encodeAudioTracks() async {
+        return await withCheckedContinuation { continuation in
+            self.audioInput!.requestMediaDataWhenReady(on: queue) {
+                let hasMoreSamples = self.assumeIsolated { _self in
+                    _self.writeReadySamples(output: _self.audioOutput!, input: _self.audioInput!)
+                }
+                if !hasMoreSamples {
+                    continuation.resume()
+                }
+            }
+        }
+    }
+
+    private func encodeVideoTracks() async {
+        return await withCheckedContinuation { continuation in
+            self.videoInput!.requestMediaDataWhenReady(on: queue) {
+                let hasMoreSamples = self.assumeIsolated { _self in
+                    _self.writeReadySamples(output: _self.videoOutput!, input: _self.videoInput!)
+                }
+                if !hasMoreSamples {
+                    continuation.resume()
+                }
+            }
+        }
+    }
 }

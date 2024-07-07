@@ -13,6 +13,7 @@
 		7B9BC0192C305D2C00C160C2 /* SJSAssetExportSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B9BC0182C305D2C00C160C2 /* SJSAssetExportSessionTests.swift */; };
 		7B9BC01A2C305D2C00C160C2 /* SJSAssetExportSession.h in Headers */ = {isa = PBXBuildFile; fileRef = 7B9BC00C2C305D2C00C160C2 /* SJSAssetExportSession.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		7B9BC0282C30612C00C160C2 /* ExportSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B9BC0272C30612C00C160C2 /* ExportSession.swift */; };
+		7BC5FC712C3A52B50090B757 /* test.mov in Resources */ = {isa = PBXBuildFile; fileRef = 7BC5FC702C3A52B50090B757 /* test.mov */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -33,6 +34,7 @@
 		7B9BC0132C305D2C00C160C2 /* SJSAssetExportSessionTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SJSAssetExportSessionTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7B9BC0182C305D2C00C160C2 /* SJSAssetExportSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SJSAssetExportSessionTests.swift; sourceTree = "<group>"; };
 		7B9BC0272C30612C00C160C2 /* ExportSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportSession.swift; sourceTree = "<group>"; };
+		7BC5FC702C3A52B50090B757 /* test.mov */ = {isa = PBXFileReference; lastKnownFileType = video.quicktime; path = test.mov; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -86,9 +88,18 @@
 		7B9BC0172C305D2C00C160C2 /* SJSAssetExportSessionTests */ = {
 			isa = PBXGroup;
 			children = (
+				7BC5FC6D2C3A525A0090B757 /* Resources */,
 				7B9BC0182C305D2C00C160C2 /* SJSAssetExportSessionTests.swift */,
 			);
 			path = SJSAssetExportSessionTests;
+			sourceTree = "<group>";
+		};
+		7BC5FC6D2C3A525A0090B757 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				7BC5FC702C3A52B50090B757 /* test.mov */,
+			);
+			path = Resources;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -190,6 +201,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7BC5FC712C3A52B50090B757 /* test.mov in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
