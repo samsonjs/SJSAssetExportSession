@@ -10,7 +10,7 @@ import AVFoundation
 import Testing
 
 final class ExportSessionTests {
-    @Test func test_encode_h264_720p_24fps() async throws {
+    @Test func test_export_h264_720p_24fps() async throws {
         let sourceURL = Bundle(for: Self.self).url(forResource: "test", withExtension: "mov")!
         let sourceAsset = AVURLAsset(url: sourceURL)
         let timestamp = Int(Date.now.timeIntervalSince1970)
