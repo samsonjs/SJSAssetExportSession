@@ -10,7 +10,7 @@ import AVFoundation
 import Testing
 
 final class ExportSessionTests {
-    @Test func test_encode_h264_720p_30fps() async throws {
+    @Test func test_encode_h264_720p_24fps() async throws {
         let sourceURL = Bundle(for: Self.self).url(forResource: "test", withExtension: "mov")!
         let sourceAsset = AVURLAsset(url: sourceURL)
         let timestamp = Int(Date.now.timeIntervalSince1970)
@@ -22,7 +22,7 @@ final class ExportSessionTests {
         let videoComposition = try await AVMutableVideoComposition.videoComposition(withPropertiesOf: sourceAsset)
         videoComposition.renderSize = size
         videoComposition.renderScale = 1
-        videoComposition.frameDuration = CMTime(value: 1, timescale: 30)
+        videoComposition.frameDuration = CMTime(seconds: 1 / 24, preferredTimescale: 600)
         videoComposition.colorPrimaries = AVVideoColorPrimaries_ITU_R_709_2
         videoComposition.colorTransferFunction = AVVideoTransferFunction_ITU_R_709_2
         videoComposition.colorYCbCrMatrix = AVVideoYCbCrMatrix_ITU_R_709_2
@@ -42,7 +42,6 @@ final class ExportSessionTests {
                 AVVideoHeightKey: NSNumber(value: Int(size.height)),
                 AVVideoCompressionPropertiesKey: [
                     AVVideoAverageBitRateKey: NSNumber(value: 1_000_000),
-                    AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel as String,
                 ] as [String: any Sendable],
             ],
             timeRange: CMTimeRange(start: .zero, duration: duration),
@@ -63,8 +62,9 @@ final class ExportSessionTests {
         // Video
         try #require(await asset.loadTracks(withMediaType: .video).count == 1)
         let videoTrack = try #require(await asset.loadTracks(withMediaType: .video).first)
-        #expect(try await videoTrack.load(.naturalSize) == size)
-        print(try await videoTrack.load(.formatDescriptions))
+        #expect(try await videoTrack.load(.naturalSize) == CGSize(width: 1280, height: 720))
+        #expect(try await videoTrack.load(.nominalFrameRate) == 24)
+        #expect(try await videoTrack.load(.estimatedDataRate) == 1_082_048)
         let videoFormat = try #require(await videoTrack.load(.formatDescriptions).first)
         #expect(videoFormat.mediaType == .video)
         #expect(videoFormat.mediaSubType == .h264)
