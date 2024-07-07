@@ -17,6 +17,8 @@ private extension AVAsset {
 }
 
 actor SampleWriter {
+    typealias Error = ExportSession.Error
+
     private let queue = DispatchSerialQueue(
         label: "SJSAssetExportSession.SampleWriter",
         autoreleaseFrequency: .workItem,
@@ -81,7 +83,7 @@ actor SampleWriter {
         let writer = try AVAssetWriter(outputURL: outputURL, fileType: fileType)
         writer.shouldOptimizeForNetworkUse = optimizeForNetworkUse
         guard writer.canApply(outputSettings: videoOutputSettings, forMediaType: .video) else {
-            throw ExportSession.Error.setupFailure(reason: "Cannot apply video output settings")
+            throw Error.setupFailure(reason: "Cannot apply video output settings")
         }
 
         let audioTracks = try await asset.sendTracks(withMediaType: .audio)
@@ -114,10 +116,10 @@ actor SampleWriter {
             throw CancellationError()
         } else if writer.status == .failed {
             reader.cancelReading()
-            throw ExportSession.Error.writeFailure(writer.error)
+            throw Error.writeFailure(writer.error)
         } else if reader.status == .failed {
             writer.cancelWriting()
-            throw ExportSession.Error.readFailure(reader.error)
+            throw Error.readFailure(reader.error)
         } else {
             await withCheckedContinuation { continuation in
                 writer.finishWriting {
@@ -134,7 +136,7 @@ actor SampleWriter {
         audioOutput.alwaysCopiesSampleData = false
         audioOutput.audioMix = audioMix
         guard reader.canAdd(audioOutput) else {
-            throw ExportSession.Error.setupFailure(reason: "Can't add audio output to reader")
+            throw Error.setupFailure(reason: "Can't add audio output to reader")
         }
         reader.add(audioOutput)
         self.audioOutput = audioOutput
@@ -142,7 +144,7 @@ actor SampleWriter {
         let audioInput = AVAssetWriterInput(mediaType: .audio, outputSettings: audioOutputSettings)
         audioInput.expectsMediaDataInRealTime = false
         guard writer.canAdd(audioInput) else {
-            throw ExportSession.Error.setupFailure(reason: "Can't add audio input to writer")
+            throw Error.setupFailure(reason: "Can't add audio input to writer")
         }
         writer.add(audioInput)
         self.audioInput = audioInput
@@ -150,7 +152,7 @@ actor SampleWriter {
 
     private func setUpVideo(videoTracks: [AVAssetTrack]) throws {
         guard !videoTracks.isEmpty else {
-            throw ExportSession.Error.setupFailure(reason: "No video tracks")
+            throw Error.setupFailure(reason: "No video tracks")
         }
 
         let videoOutput = AVAssetReaderVideoCompositionOutput(
@@ -160,7 +162,7 @@ actor SampleWriter {
         videoOutput.alwaysCopiesSampleData = false
         videoOutput.videoComposition = videoComposition
         guard reader.canAdd(videoOutput) else {
-            throw ExportSession.Error.setupFailure(reason: "Can't add video output to reader")
+            throw Error.setupFailure(reason: "Can't add video output to reader")
         }
         reader.add(videoOutput)
         self.videoOutput = videoOutput
@@ -168,7 +170,7 @@ actor SampleWriter {
         let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoOutputSettings)
         videoInput.expectsMediaDataInRealTime = false
         guard writer.canAdd(videoInput) else {
-            throw ExportSession.Error.setupFailure(reason: "Can't add video input to writer")
+            throw Error.setupFailure(reason: "Can't add video input to writer")
         }
         writer.add(videoInput)
         self.videoInput = videoInput
