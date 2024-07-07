@@ -21,7 +21,7 @@ final class ExportSessionTests {
         let duration = CMTime(seconds: 1, preferredTimescale: 600)
         let videoComposition = try await AVMutableVideoComposition.videoComposition(withPropertiesOf: sourceAsset)
         videoComposition.renderSize = size
-        videoComposition.renderScale = 1
+        videoComposition.sourceTrackIDForFrameTiming = kCMPersistentTrackID_Invalid
         videoComposition.frameDuration = CMTime(seconds: 1 / 24, preferredTimescale: 600)
         videoComposition.colorPrimaries = AVVideoColorPrimaries_ITU_R_709_2
         videoComposition.colorTransferFunction = AVVideoTransferFunction_ITU_R_709_2
@@ -63,8 +63,8 @@ final class ExportSessionTests {
         try #require(await asset.loadTracks(withMediaType: .video).count == 1)
         let videoTrack = try #require(await asset.loadTracks(withMediaType: .video).first)
         #expect(try await videoTrack.load(.naturalSize) == CGSize(width: 1280, height: 720))
-        #expect(try await videoTrack.load(.nominalFrameRate) == 24)
-        #expect(try await videoTrack.load(.estimatedDataRate) == 1_082_048)
+        #expect(try await videoTrack.load(.nominalFrameRate) == 24.0)
+        #expect(try await videoTrack.load(.estimatedDataRate) == 1_036_128)
         let videoFormat = try #require(await videoTrack.load(.formatDescriptions).first)
         #expect(videoFormat.mediaType == .video)
         #expect(videoFormat.mediaSubType == .h264)
