@@ -8,72 +8,8 @@
 public import AVFoundation
 
 
-// @unchecked Sendable because progress properties are mutable, it's safe though.
 public final class ExportSession: @unchecked Sendable {
-    public enum SetupFailureReason: String, Sendable, CustomStringConvertible {
-        case audioSettingsEmpty
-        case audioSettingsInvalid
-        case cannotAddAudioInput
-        case cannotAddAudioOutput
-        case cannotAddVideoInput
-        case cannotAddVideoOutput
-        case videoSettingsEmpty
-        case videoSettingsInvalid
-        case videoTracksEmpty
-
-        public var description: String {
-            switch self {
-            case .audioSettingsEmpty:
-                "Must provide audio output settings"
-            case .audioSettingsInvalid:
-                "Invalid audio output settings"
-            case .cannotAddAudioInput:
-                "Can't add audio input to writer"
-            case .cannotAddAudioOutput:
-                "Can't add audio output to reader"
-            case .cannotAddVideoInput:
-                "Can't add video input to writer"
-            case .cannotAddVideoOutput:
-                "Can't add video output to reader"
-            case .videoSettingsEmpty:
-                "Must provide video output settings"
-            case .videoSettingsInvalid:
-                "Invalid video output settings"
-            case .videoTracksEmpty:
-                "No video track"
-            }
-        }
-    }
-
-    public enum Error: LocalizedError, Equatable {
-        case setupFailure(SetupFailureReason)
-        case readFailure((any Swift.Error)?)
-        case writeFailure((any Swift.Error)?)
-
-        public var errorDescription: String? {
-            switch self {
-            case let .setupFailure(reason):
-                reason.description
-            case let .readFailure(underlyingError):
-                underlyingError?.localizedDescription ?? "Unknown read failure"
-            case let .writeFailure(underlyingError):
-                underlyingError?.localizedDescription ?? "Unknown write failure"
-            }
-        }
-
-        public static func == (lhs: ExportSession.Error, rhs: ExportSession.Error) -> Bool {
-            switch (lhs, rhs) {
-            case let (.setupFailure(lhsReason), .setupFailure(rhsReason)):
-                lhsReason == rhsReason
-            case let (.readFailure(lhsError), .readFailure(rhsError)):
-                String(describing: lhsError) == String(describing: rhsError)
-            case let (.writeFailure(lhsError), .writeFailure(rhsError)):
-                String(describing: lhsError) == String(describing: rhsError)
-            default:
-                false
-            }
-        }
-    }
+    // @unchecked Sendable because progress properties are mutable, it's safe though.
 
     public typealias ProgressStream = AsyncStream<Float>
 
@@ -87,6 +23,33 @@ public final class ExportSession: @unchecked Sendable {
         }
     }
 
+    /**
+     Exports the given asset using all of the other parameters to transform it in some way.
+
+     - Parameters:
+       - asset: The source asset to export. This can be any kind of `AVAsset` including subclasses such as `AVComposition`.
+
+       - audioMix: An optional mix that can be used to manipulate the audio in some way.
+
+       - audioOutputSettings: Audio settings using [audio settings keys from AVFoundation](https://developer.apple.com/documentation/avfoundation/audio_settings) and values must be suitable for consumption by Objective-C. Required keys are:
+         - `AVFormatIDKey` with the typical value `kAudioFormatMPEG4AAC`
+         - `AVNumberOfChannelsKey` with the typical value `NSNumber(value: 2)` or `AVChannelLayoutKey` with an instance of `AVAudioChannelLayout`
+
+       - videoComposition: Used to manipulate the video in some way. This can be used to scale the video, apply filters, amongst other edits.
+
+       - videoOutputSettings: Video settings using [video settings keys from AVFoundation](https://developer.apple.com/documentation/avfoundation/video_settings) and values must be suitable for consumption by Objective-C. Required keys are:
+          - `AVVideoCodecKey` with the typical value `AVVideoCodecType.h264.rawValue` or `AVVideoCodecType.hevc.rawValue`
+          - `AVVideoWidthKey` with an integer as an `NSNumber`
+          - `AVVideoHeightKey` with an integer as an `NSNumber`
+
+       - timeRange: Providing a time range exports a subset of the asset instead of the entire duration, which is the default behaviour.
+
+       - optimizeForNetworkUse: Setting this value to `true` writes the output file in a form that enables a player to begin playing the media after downloading only a small portion of it. Defaults to `false`.
+
+       - outputURL: The file URL where the exported video will be written.
+
+       - fileType: The type of of video file to export. This will typically be one of `AVFileType.mp4`, `AVFileType.m4v`, or `AVFileType.mov`.
+     */
     public func export(
         asset: sending AVAsset,
         audioMix: sending AVAudioMix?,
@@ -100,11 +63,11 @@ public final class ExportSession: @unchecked Sendable {
     ) async throws {
         let sampleWriter = try await SampleWriter(
             asset: asset,
-            timeRange: timeRange ?? CMTimeRange(start: .zero, duration: .positiveInfinity),
             audioMix: audioMix,
             audioOutputSettings: audioOutputSettings,
             videoComposition: videoComposition,
             videoOutputSettings: videoOutputSettings,
+            timeRange: timeRange,
             optimizeForNetworkUse: optimizeForNetworkUse,
             outputURL: outputURL,
             fileType: fileType

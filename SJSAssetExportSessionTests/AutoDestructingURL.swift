@@ -8,7 +8,7 @@
 import Foundation
 import OSLog
 
-private let log = Logger(OSLog(subsystem: "SJSAssetExportSessionTests", category: "AutoDestructingURL"))
+private let log = Logger(subsystem: "SJSAssetExportSessionTests", category: "AutoDestructingURL")
 
 /// Wraps a URL and deletes it when this instance is deallocated. Failures to delete the file are logged.
 final class AutoDestructingURL: Hashable, Sendable {
