@@ -53,7 +53,7 @@ actor SampleWriter {
 
     private var videoInput: AVAssetWriterInput?
 
-    private lazy var progressStream: AsyncStream<Float> = AsyncStream { continuation in
+    lazy var progressStream: AsyncStream<Float> = AsyncStream { continuation in
         progressContinuation = continuation
     }
 
@@ -70,6 +70,10 @@ actor SampleWriter {
         outputURL: URL,
         fileType: AVFileType
     ) async throws {
+        guard !videoOutputSettings.isEmpty else {
+            throw Error.setupFailure(.videoSettingsEmpty)
+        }
+
         let duration =
         if timeRange.duration.isValid && !timeRange.duration.isPositiveInfinity {
             timeRange.duration
@@ -82,12 +86,25 @@ actor SampleWriter {
 
         let writer = try AVAssetWriter(outputURL: outputURL, fileType: fileType)
         writer.shouldOptimizeForNetworkUse = optimizeForNetworkUse
-        guard writer.canApply(outputSettings: videoOutputSettings, forMediaType: .video) else {
-            throw Error.setupFailure(reason: "Cannot apply video output settings")
-        }
 
         let audioTracks = try await asset.sendTracks(withMediaType: .audio)
+        if !audioTracks.isEmpty {
+            guard !audioOutputSettings.isEmpty else {
+                throw Error.setupFailure(.audioSettingsEmpty)
+            }
+            guard writer.canApply(outputSettings: audioOutputSettings, forMediaType: .audio) else {
+                throw Error.setupFailure(.audioSettingsInvalid)
+            }
+        }
+
         let videoTracks = try await asset.sendTracks(withMediaType: .video)
+        guard !videoTracks.isEmpty else {
+            throw Error.setupFailure(.videoTracksEmpty)
+        }
+        guard writer.canApply(outputSettings: videoOutputSettings, forMediaType: .video) else {
+            throw Error.setupFailure(.videoSettingsInvalid)
+        }
+
 
         self.audioMix = audioMix
         self.audioOutputSettings = audioOutputSettings
@@ -103,30 +120,40 @@ actor SampleWriter {
     }
 
     func writeSamples() async throws {
-        progressContinuation?.yield(0)
+        progressContinuation?.yield(0.0)
 
         writer.startWriting()
         reader.startReading()
         writer.startSession(atSourceTime: timeRange.start)
 
-        await encodeAudioTracks()
         await encodeVideoTracks()
+        await encodeAudioTracks()
 
-        if reader.status == .cancelled || writer.status == .cancelled {
+        try Task.checkCancellation()
+
+        guard reader.status != .cancelled && writer.status != .cancelled else {
             throw CancellationError()
-        } else if writer.status == .failed {
+        }
+        guard writer.status != .failed else {
             reader.cancelReading()
             throw Error.writeFailure(writer.error)
-        } else if reader.status == .failed {
+        }
+        guard reader.status != .failed else {
             writer.cancelWriting()
             throw Error.readFailure(reader.error)
-        } else {
-            await withCheckedContinuation { continuation in
-                writer.finishWriting {
-                    continuation.resume(returning: ())
-                }
+        }
+
+        await withCheckedContinuation { continuation in
+            writer.finishWriting {
+                continuation.resume(returning: ())
             }
         }
+
+        progressContinuation?.yield(1.0)
+        progressContinuation?.finish()
+
+        // Make sure the last progress value is yielded before returning.
+        await Task.yield()
     }
 
     private func setUpAudio(audioTracks: [AVAssetTrack]) throws {
@@ -136,7 +163,7 @@ actor SampleWriter {
         audioOutput.alwaysCopiesSampleData = false
         audioOutput.audioMix = audioMix
         guard reader.canAdd(audioOutput) else {
-            throw Error.setupFailure(reason: "Can't add audio output to reader")
+            throw Error.setupFailure(.cannotAddAudioOutput)
         }
         reader.add(audioOutput)
         self.audioOutput = audioOutput
@@ -144,16 +171,14 @@ actor SampleWriter {
         let audioInput = AVAssetWriterInput(mediaType: .audio, outputSettings: audioOutputSettings)
         audioInput.expectsMediaDataInRealTime = false
         guard writer.canAdd(audioInput) else {
-            throw Error.setupFailure(reason: "Can't add audio input to writer")
+            throw Error.setupFailure(.cannotAddAudioInput)
         }
         writer.add(audioInput)
         self.audioInput = audioInput
     }
 
     private func setUpVideo(videoTracks: [AVAssetTrack]) throws {
-        guard !videoTracks.isEmpty else {
-            throw Error.setupFailure(reason: "No video tracks")
-        }
+        precondition(!videoTracks.isEmpty, "Video tracks must be provided")
 
         let videoOutput = AVAssetReaderVideoCompositionOutput(
             videoTracks: videoTracks,
@@ -162,7 +187,7 @@ actor SampleWriter {
         videoOutput.alwaysCopiesSampleData = false
         videoOutput.videoComposition = videoComposition
         guard reader.canAdd(videoOutput) else {
-            throw Error.setupFailure(reason: "Can't add video output to reader")
+            throw Error.setupFailure(.cannotAddVideoOutput)
         }
         reader.add(videoOutput)
         self.videoOutput = videoOutput
@@ -170,7 +195,7 @@ actor SampleWriter {
         let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoOutputSettings)
         videoInput.expectsMediaDataInRealTime = false
         guard writer.canAdd(videoInput) else {
-            throw Error.setupFailure(reason: "Can't add video input to writer")
+            throw Error.setupFailure(.cannotAddVideoInput)
         }
         writer.add(videoInput)
         self.videoInput = videoInput
@@ -184,6 +209,10 @@ actor SampleWriter {
                 log.debug("Finished encoding ready audio samples from \(output)")
                 return false
             }
+
+            let samplePresentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer) - timeRange.start
+            let progress = Float(samplePresentationTime.seconds / duration.seconds)
+            progressContinuation?.yield(progress)
 
             guard input.append(sampleBuffer) else {
                 log.error("""
@@ -200,6 +229,8 @@ actor SampleWriter {
     }
 
     private func encodeAudioTracks() async {
+        guard audioInput != nil, audioOutput != nil else { return }
+
         return await withCheckedContinuation { continuation in
             self.audioInput!.requestMediaDataWhenReady(on: queue) {
                 let hasMoreSamples = self.assumeIsolated { _self in
