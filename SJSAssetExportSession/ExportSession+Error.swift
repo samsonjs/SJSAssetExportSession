@@ -15,7 +15,6 @@ extension ExportSession {
         case cannotAddAudioOutput
         case cannotAddVideoInput
         case cannotAddVideoOutput
-        case videoSettingsEmpty
         case videoSettingsInvalid
         case videoTracksEmpty
 
@@ -33,8 +32,6 @@ extension ExportSession {
                 "Can't add video input to writer"
             case .cannotAddVideoOutput:
                 "Can't add video output to reader"
-            case .videoSettingsEmpty:
-                "Must provide video output settings"
             case .videoSettingsInvalid:
                 "Invalid video output settings"
             case .videoTracksEmpty:

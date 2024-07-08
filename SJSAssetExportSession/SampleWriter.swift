@@ -32,10 +32,10 @@ actor SampleWriter {
     }
     private var progressContinuation: AsyncStream<Float>.Continuation?
 
-    private let audioMix: AVAudioMix?
     private let audioOutputSettings: [String: (any Sendable)]
-    private let videoComposition: AVVideoComposition?
+    private let audioMix: AVAudioMix?
     private let videoOutputSettings: [String: (any Sendable)]
+    private let videoComposition: AVVideoComposition?
     private let reader: AVAssetReader
     private let writer: AVAssetWriter
     private let duration: CMTime
@@ -47,15 +47,17 @@ actor SampleWriter {
 
     init(
         asset: sending AVAsset,
-        audioMix: AVAudioMix?,
         audioOutputSettings: sending [String: (any Sendable)],
-        videoComposition: AVVideoComposition,
+        audioMix: AVAudioMix?,
         videoOutputSettings: sending [String: (any Sendable)],
+        videoComposition: AVVideoComposition,
         timeRange: CMTimeRange? = nil,
         optimizeForNetworkUse: Bool = false,
         outputURL: URL,
         fileType: AVFileType
     ) async throws {
+        precondition(!videoOutputSettings.isEmpty)
+
         let duration =
         if let timeRange { timeRange.duration } else { try await asset.load(.duration) }
         let reader = try AVAssetReader(asset: asset)
@@ -69,15 +71,15 @@ actor SampleWriter {
         try Self.validateAudio(tracks: audioTracks, outputSettings: audioOutputSettings, writer: writer)
         let videoTracks = try await asset.sendTracks(withMediaType: .video)
         try Self.validateVideo(tracks: videoTracks, outputSettings: videoOutputSettings, writer: writer)
-        Self.warnAboutMismatchedVideoDimensions(
+        Self.warnAboutMismatchedVideoSize(
             renderSize: videoComposition.renderSize,
             settings: videoOutputSettings
         )
 
-        self.audioMix = audioMix
         self.audioOutputSettings = audioOutputSettings
-        self.videoComposition = videoComposition
+        self.audioMix = audioMix
         self.videoOutputSettings = videoOutputSettings
+        self.videoComposition = videoComposition
         self.reader = reader
         self.writer = writer
         self.duration = duration
@@ -250,13 +252,12 @@ actor SampleWriter {
         writer: AVAssetWriter
     ) throws {
         guard !tracks.isEmpty else { throw Error.setupFailure(.videoTracksEmpty) }
-        guard !outputSettings.isEmpty else { throw Error.setupFailure(.videoSettingsEmpty) }
         guard writer.canApply(outputSettings: outputSettings, forMediaType: .video) else {
             throw Error.setupFailure(.videoSettingsInvalid)
         }
     }
 
-    private static func warnAboutMismatchedVideoDimensions(
+    private static func warnAboutMismatchedVideoSize(
         renderSize: CGSize,
         settings: [String: any Sendable]
     ) {
