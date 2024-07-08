@@ -1,11 +1,11 @@
 //
-//  AVFoundation+sending.swift
-//  SJSAssetExportSessionTests
+//  AVAsset+sending.swift
+//  SJSAssetExportSession
 //
 //  Created by Sami Samhuri on 2024-07-07.
 //
 
-import AVFoundation
+internal import AVFoundation
 
 extension AVAsset {
     func sendTracks(withMediaType mediaType: AVMediaType) async throws -> sending [AVAssetTrack] {

@@ -10,12 +10,6 @@ import OSLog
 
 private let log = Logger(subsystem: "SJSAssetExportSession", category: "SampleWriter")
 
-private extension AVAsset {
-    func sendTracks(withMediaType mediaType: AVMediaType) async throws -> sending [AVAssetTrack] {
-        try await loadTracks(withMediaType: mediaType)
-    }
-}
-
 actor SampleWriter {
     typealias Error = ExportSession.Error
 

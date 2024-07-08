@@ -21,13 +21,14 @@ final class AutoDestructingURL: Hashable, Sendable {
 
     deinit {
         let fm = FileManager.default
-        guard fm.fileExists(atPath: url.path) else { return }
+        let path = url.path()
+        guard fm.fileExists(atPath: path) else { return }
 
         do {
             try fm.removeItem(at: url)
-            log.debug("Auto-destructed \(self.url)")
+            log.debug("Auto-destructed \(path)")
         } catch {
-            log.error("Failed to auto-destruct \(self.url): \(error)")
+            log.error("Failed to auto-destruct \(path): \(error)")
         }
     }
 
