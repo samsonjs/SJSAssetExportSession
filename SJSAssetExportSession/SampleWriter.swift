@@ -17,8 +17,7 @@ actor SampleWriter {
 
     private let queue = DispatchSerialQueue(
         label: "SJSAssetExportSession.SampleWriter",
-        autoreleaseFrequency: .workItem,
-        target: .global()
+        qos: .userInitiated
     )
 
     // Execute this actor on the same queue we use to request media data so we can use
