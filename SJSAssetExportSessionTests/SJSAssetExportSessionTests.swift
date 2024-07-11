@@ -297,4 +297,28 @@ final class ExportSessionTests {
             )
         }
     }
+
+    @Test func test_export_cancellation() async throws {
+        let sourceURL = resourceURL(named: "test-720p-h264-24fps", withExtension: "mov")
+        let destinationURL💥 = makeTemporaryURL()
+        let task = Task {
+            let sourceAsset = AVURLAsset(url: sourceURL, options: [
+                AVURLAssetPreferPreciseDurationAndTimingKey: true,
+            ])
+            let subject = ExportSession()
+            try await subject.export(
+                asset: sourceAsset,
+                video: .codec(.h264, width: 1280, height: 720),
+                to: destinationURL💥.url,
+                as: .mov
+            )
+            Issue.record("Task should be cancelled long before we get here")
+        }
+        NSLog("Sleeping for 0.3s")
+        try await Task.sleep(for: .milliseconds(300))
+        NSLog("Cancelling task")
+        task.cancel()
+        try? await task.value // Wait for task to complete
+        NSLog("Task has finished executing")
+    }
 }

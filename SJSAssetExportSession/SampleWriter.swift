@@ -44,6 +44,7 @@ actor SampleWriter {
     private var audioInput: AVAssetWriterInput?
     private var videoOutput: AVAssetReaderVideoCompositionOutput?
     private var videoInput: AVAssetWriterInput?
+    private var isCancelled = false
 
     init(
         asset: sending AVAsset,
@@ -90,15 +91,19 @@ actor SampleWriter {
     }
 
     func writeSamples() async throws {
+        try Task.checkCancellation()
+
         progressContinuation?.yield(0.0)
 
         writer.startWriting()
-        reader.startReading()
         writer.startSession(atSourceTime: timeRange.start)
+        reader.startReading()
+        try Task.checkCancellation()
 
         await encodeVideoTracks()
-        await encodeAudioTracks()
+        try Task.checkCancellation()
 
+        await encodeAudioTracks()
         try Task.checkCancellation()
 
         guard reader.status != .cancelled && writer.status != .cancelled else {
@@ -173,33 +178,75 @@ actor SampleWriter {
         self.videoInput = videoInput
     }
 
+    func cancel() async {
+        isCancelled = true
+    }
+
     // MARK: - Encoding
 
     private func encodeAudioTracks() async {
         // Don't do anything when we have no audio to encode.
         guard audioInput != nil, audioOutput != nil else { return }
 
-        return await withCheckedContinuation { continuation in
-            self.audioInput!.requestMediaDataWhenReady(on: queue) {
-                let hasMoreSamples = self.assumeIsolated { _self in
-                    _self.writeReadySamples(output: _self.audioOutput!, input: _self.audioInput!)
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                self.audioInput!.requestMediaDataWhenReady(on: queue) {
+                    self.assumeIsolated { _self in
+                        guard !_self.isCancelled else {
+                            log.debug("Cancelled while encoding audio")
+                            _self.reader.cancelReading()
+                            _self.writer.cancelWriting()
+                            continuation.resume()
+                            return
+                        }
+
+                        let hasMoreSamples = _self.writeReadySamples(
+                            output: _self.audioOutput!,
+                            input: _self.audioInput!
+                        )
+                        if !hasMoreSamples {
+                            log.debug("Finished encoding audio")
+                            continuation.resume()
+                        }
+                    }
                 }
-                if !hasMoreSamples {
-                    continuation.resume()
-                }
+            }
+        } onCancel: {
+            log.debug("Task cancelled while encoding audio")
+            Task {
+                await self.cancel()
             }
         }
     }
 
     private func encodeVideoTracks() async {
-        return await withCheckedContinuation { continuation in
-            self.videoInput!.requestMediaDataWhenReady(on: queue) {
-                let hasMoreSamples = self.assumeIsolated { _self in
-                    _self.writeReadySamples(output: _self.videoOutput!, input: _self.videoInput!)
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                self.videoInput!.requestMediaDataWhenReady(on: queue) {
+                    self.assumeIsolated { _self in
+                        guard !_self.isCancelled else {
+                            log.debug("Cancelled while encoding video")
+                            _self.reader.cancelReading()
+                            _self.writer.cancelWriting()
+                            continuation.resume()
+                            return
+                        }
+
+                        let hasMoreSamples = _self.writeReadySamples(
+                            output: _self.videoOutput!,
+                            input: _self.videoInput!
+                        )
+                        if !hasMoreSamples {
+                            log.debug("Finished encoding video")
+                            continuation.resume()
+                        }
+                    }
                 }
-                if !hasMoreSamples {
-                    continuation.resume()
-                }
+            }
+        } onCancel: {
+            log.debug("Task cancelled while encoding video")
+            Task {
+                await self.cancel()
             }
         }
     }
