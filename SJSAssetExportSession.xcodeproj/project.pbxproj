@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		7B7AE3092C36615700DB7391 /* SampleWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B7AE3082C36615700DB7391 /* SampleWriter.swift */; };
+		7B9867982C6AF57C001353BC /* AVAsset+sending.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BC5FC8B2C3BB0180090B757 /* AVAsset+sending.swift */; };
 		7B9BC00E2C305D2C00C160C2 /* SJSAssetExportSession.docc in Sources */ = {isa = PBXBuildFile; fileRef = 7B9BC00D2C305D2C00C160C2 /* SJSAssetExportSession.docc */; };
 		7B9BC0142C305D2C00C160C2 /* SJSAssetExportSession.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7B9BC0092C305D2C00C160C2 /* SJSAssetExportSession.framework */; };
 		7B9BC0192C305D2C00C160C2 /* SJSAssetExportSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B9BC0182C305D2C00C160C2 /* SJSAssetExportSessionTests.swift */; };
@@ -16,7 +17,6 @@
 		7BC5FC772C3B8C5A0090B757 /* SendableWrapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BC5FC762C3B8C5A0090B757 /* SendableWrapper.swift */; };
 		7BC5FC792C3B90F70090B757 /* AutoDestructingURL.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BC5FC782C3B90F70090B757 /* AutoDestructingURL.swift */; };
 		7BC5FC8A2C3BAA150090B757 /* ExportSession+Error.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BC5FC892C3BAA150090B757 /* ExportSession+Error.swift */; };
-		7BC5FC8C2C3BB0180090B757 /* AVAsset+sending.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BC5FC8B2C3BB0180090B757 /* AVAsset+sending.swift */; };
 		7BC5FC902C3BB2030090B757 /* AudioOutputSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BC5FC8F2C3BB2030090B757 /* AudioOutputSettings.swift */; };
 		7BC5FC922C3BB4BD0090B757 /* VideoOutputSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BC5FC912C3BB4BD0090B757 /* VideoOutputSettings.swift */; };
 		7BC5FC942C3BC3AD0090B757 /* CMTime+seconds.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BC5FC932C3BC3AD0090B757 /* CMTime+seconds.swift */; };
@@ -95,7 +95,6 @@
 			children = (
 				7BC5FC8F2C3BB2030090B757 /* AudioOutputSettings.swift */,
 				7BC5FC912C3BB4BD0090B757 /* VideoOutputSettings.swift */,
-				7BC5FC8B2C3BB0180090B757 /* AVAsset+sending.swift */,
 				7BC5FC932C3BC3AD0090B757 /* CMTime+seconds.swift */,
 				7B9BC0272C30612C00C160C2 /* ExportSession.swift */,
 				7BC5FC892C3BAA150090B757 /* ExportSession+Error.swift */,
@@ -110,6 +109,7 @@
 			isa = PBXGroup;
 			children = (
 				7BC5FC782C3B90F70090B757 /* AutoDestructingURL.swift */,
+				7BC5FC8B2C3BB0180090B757 /* AVAsset+sending.swift */,
 				7BC5FC812C3B9E3D0090B757 /* Resources */,
 				7BC5FC762C3B8C5A0090B757 /* SendableWrapper.swift */,
 				7B9BC0182C305D2C00C160C2 /* SJSAssetExportSessionTests.swift */,
@@ -233,7 +233,6 @@
 				7B7AE3092C36615700DB7391 /* SampleWriter.swift in Sources */,
 				7BC5FC902C3BB2030090B757 /* AudioOutputSettings.swift in Sources */,
 				7B9BC0282C30612C00C160C2 /* ExportSession.swift in Sources */,
-				7BC5FC8C2C3BB0180090B757 /* AVAsset+sending.swift in Sources */,
 				7BC5FC922C3BB4BD0090B757 /* VideoOutputSettings.swift in Sources */,
 				7B9BC00E2C305D2C00C160C2 /* SJSAssetExportSession.docc in Sources */,
 				7BC5FC8A2C3BAA150090B757 /* ExportSession+Error.swift in Sources */,
@@ -246,6 +245,7 @@
 			files = (
 				7B9BC0192C305D2C00C160C2 /* SJSAssetExportSessionTests.swift in Sources */,
 				7BC5FC792C3B90F70090B757 /* AutoDestructingURL.swift in Sources */,
+				7B9867982C6AF57C001353BC /* AVAsset+sending.swift in Sources */,
 				7BC5FC772C3B8C5A0090B757 /* SendableWrapper.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -45,12 +45,12 @@ actor SampleWriter {
     private var videoInput: AVAssetWriterInput?
     private var isCancelled = false
 
-    init(
+    nonisolated init(
         asset: sending AVAsset,
         audioOutputSettings: sending [String: (any Sendable)],
-        audioMix: AVAudioMix?,
+        audioMix: sending AVAudioMix?,
         videoOutputSettings: sending [String: (any Sendable)],
-        videoComposition: AVVideoComposition,
+        videoComposition: sending AVVideoComposition,
         timeRange: CMTimeRange? = nil,
         optimizeForNetworkUse: Bool = false,
         outputURL: URL,
@@ -67,10 +67,14 @@ actor SampleWriter {
         let writer = try AVAssetWriter(outputURL: outputURL, fileType: fileType)
         writer.shouldOptimizeForNetworkUse = optimizeForNetworkUse
 
-        let audioTracks = try await asset.sendTracks(withMediaType: .audio)
-        try Self.validateAudio(tracks: audioTracks, outputSettings: audioOutputSettings, writer: writer)
-        let videoTracks = try await asset.sendTracks(withMediaType: .video)
-        try Self.validateVideo(tracks: videoTracks, outputSettings: videoOutputSettings, writer: writer)
+        let audioTracks = try await asset.loadTracks(withMediaType: .audio)
+        // Audio is optional so only validate output settings when it's applicable.
+        if !audioTracks.isEmpty {
+            try Self.validateAudio(outputSettings: audioOutputSettings, writer: writer)
+        }
+        let videoTracks = try await asset.loadTracks(withMediaType: .video)
+        guard !videoTracks.isEmpty else { throw Error.setupFailure(.videoTracksEmpty) }
+        try Self.validateVideo(outputSettings: videoOutputSettings, writer: writer)
         Self.warnAboutMismatchedVideoSize(
             renderSize: videoComposition.renderSize,
             settings: videoOutputSettings
@@ -85,8 +89,8 @@ actor SampleWriter {
         self.duration = duration
         self.timeRange = timeRange ?? CMTimeRange(start: .zero, duration: duration)
 
-        try setUpAudio(audioTracks: audioTracks)
-        try setUpVideo(videoTracks: videoTracks)
+        try await setUpAudio(audioTracks: audioTracks)
+        try await setUpVideo(videoTracks: videoTracks)
     }
 
     func writeSamples() async throws {
@@ -281,11 +285,9 @@ actor SampleWriter {
     // MARK: Input validation
 
     private static func validateAudio(
-        tracks: [AVAssetTrack],
         outputSettings: [String: any Sendable],
         writer: AVAssetWriter
     ) throws {
-        guard !tracks.isEmpty else { return } // Audio is optional so this isn't a failure.
         guard !outputSettings.isEmpty else { throw Error.setupFailure(.audioSettingsEmpty) }
         guard writer.canApply(outputSettings: outputSettings, forMediaType: .audio) else {
             throw Error.setupFailure(.audioSettingsInvalid)
@@ -293,11 +295,9 @@ actor SampleWriter {
     }
 
     private static func validateVideo(
-        tracks: [AVAssetTrack],
         outputSettings: [String: any Sendable],
         writer: AVAssetWriter
     ) throws {
-        guard !tracks.isEmpty else { throw Error.setupFailure(.videoTracksEmpty) }
         guard writer.canApply(outputSettings: outputSettings, forMediaType: .video) else {
             throw Error.setupFailure(.videoSettingsInvalid)
         }

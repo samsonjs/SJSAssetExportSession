@@ -5,7 +5,7 @@
 //  Created by Sami Samhuri on 2024-07-07.
 //
 
-public import AVFoundation
+import AVFoundation
 
 public struct VideoOutputSettings {
     public enum H264Profile {

@@ -5,7 +5,7 @@
 //  Created by Sami Samhuri on 2024-06-29.
 //
 
-import AVFoundation
+internal import AVFoundation
 @testable import SJSAssetExportSession
 import Testing
 
