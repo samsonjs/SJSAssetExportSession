@@ -6,6 +6,7 @@
 //
 
 internal import AVFoundation
+import CoreLocation
 @testable import SJSAssetExportSession
 import Testing
 
@@ -320,5 +321,40 @@ final class ExportSessionTests {
         task.cancel()
         try? await task.value // Wait for task to complete
         NSLog("Task has finished executing")
+    }
+
+    @Test func test_writing_metadata() async throws {
+        let sourceURL = resourceURL(named: "test-720p-h264-24fps", withExtension: "mov")
+        let destinationURL = makeTemporaryURL()
+        let locationMetadata = AVMutableMetadataItem()
+        locationMetadata.key = AVMetadataKey.commonKeyLocation.rawValue as NSString
+        locationMetadata.keySpace = .common
+        locationMetadata.value = "+48.50176+123.34368/" as NSString
+
+        let subject = ExportSession()
+        try await subject.export(
+            asset: makeAsset(url: sourceURL),
+            metadata: [locationMetadata],
+            video: .codec(.h264, size: CGSize(width: 1280, height: 720)),
+            to: destinationURL.url,
+            as: .mov
+        )
+
+        let exportedAsset = AVURLAsset(url: destinationURL.url)
+        let exportedMetadata = try await exportedAsset.load(.metadata)
+        print(exportedMetadata)
+        #expect(exportedMetadata.count == 1)
+        let metadataValue = try await exportedMetadata.first(where: { item in
+            item.key as! String == AVMetadataKey.quickTimeMetadataKeyLocationISO6709.rawValue
+        })?.load(.value) as? NSString
+        #expect(metadataValue == "+48.50176+123.34368/")
+
+        let exportedCommonMetadata = try await exportedAsset.load(.commonMetadata)
+        print(exportedCommonMetadata)
+        #expect(exportedCommonMetadata.count == 1)
+        let commonMetadataValue = try await exportedCommonMetadata.first(where: { item in
+            item.commonKey == .commonKeyLocation
+        })?.load(.value) as? NSString
+        #expect(commonMetadataValue == "+48.50176+123.34368/")
     }
 }

@@ -53,6 +53,7 @@ actor SampleWriter {
         videoComposition: sending AVVideoComposition,
         timeRange: CMTimeRange? = nil,
         optimizeForNetworkUse: Bool = false,
+        metadata: [AVMetadataItem] = [],
         outputURL: URL,
         fileType: AVFileType
     ) async throws {
@@ -66,6 +67,7 @@ actor SampleWriter {
         }
         let writer = try AVAssetWriter(outputURL: outputURL, fileType: fileType)
         writer.shouldOptimizeForNetworkUse = optimizeForNetworkUse
+        writer.metadata = metadata
 
         let audioTracks = try await asset.loadTracks(withMediaType: .audio)
         // Audio is optional so only validate output settings when it's applicable.

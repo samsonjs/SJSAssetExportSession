@@ -25,6 +25,7 @@ public final class ExportSession: @unchecked Sendable {
     public func export(
         asset: sending AVAsset,
         optimizeForNetworkUse: Bool = false,
+        metadata: sending [AVMetadataItem] = [],
         timeRange: CMTimeRange? = nil,
         audio: sending AudioOutputSettings = .default,
         video: sending VideoOutputSettings,
@@ -42,6 +43,7 @@ public final class ExportSession: @unchecked Sendable {
             videoComposition: videoComposition,
             timeRange: timeRange,
             optimizeForNetworkUse: optimizeForNetworkUse,
+            metadata: metadata,
             outputURL: outputURL,
             fileType: fileType
         )
@@ -60,6 +62,8 @@ public final class ExportSession: @unchecked Sendable {
        - asset: The source asset to export. This can be any kind of `AVAsset` including subclasses such as `AVComposition`.
 
        - optimizeForNetworkUse: Setting this value to `true` writes the output file in a form that enables a player to begin playing the media after downloading only a small portion of it. Defaults to `false`.
+
+       - metadata: Optional array of `AVMetadataItem`s to be written out with the exported asset.
 
        - timeRange: Providing a time range exports a subset of the asset instead of the entire duration, which is the default behaviour.
 
@@ -83,6 +87,7 @@ public final class ExportSession: @unchecked Sendable {
     public func export(
         asset: sending AVAsset,
         optimizeForNetworkUse: Bool = false,
+        metadata: sending [AVMetadataItem] = [],
         timeRange: CMTimeRange? = nil,
         audioOutputSettings: [String: (any Sendable)],
         mix: sending AVAudioMix? = nil,
@@ -118,6 +123,7 @@ public final class ExportSession: @unchecked Sendable {
             videoComposition: videoComposition,
             timeRange: timeRange,
             optimizeForNetworkUse: optimizeForNetworkUse,
+            metadata: metadata,
             outputURL: outputURL,
             fileType: fileType
         )
