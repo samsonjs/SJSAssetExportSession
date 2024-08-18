@@ -106,10 +106,10 @@ actor SampleWriter {
         reader.startReading()
         try Task.checkCancellation()
 
-        await encodeVideoTracks()
+        await encodeAudioTracks()
         try Task.checkCancellation()
 
-        await encodeAudioTracks()
+        await encodeVideoTracks()
         try Task.checkCancellation()
 
         guard reader.status != .cancelled && writer.status != .cancelled else {
