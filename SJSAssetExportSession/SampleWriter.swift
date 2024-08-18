@@ -131,10 +131,15 @@ actor SampleWriter {
         }
 
         progressContinuation?.yield(1.0)
-        progressContinuation?.finish()
 
         // Make sure the last progress value is yielded before returning.
         await Task.yield()
+        await withCheckedContinuation { continuation in
+            progressContinuation?.onTermination = { _ in
+                continuation.resume(returning: ())
+            }
+            progressContinuation?.finish()
+        }
     }
 
     // MARK: - Setup
