@@ -7,19 +7,13 @@
 
 public import AVFoundation
 
-public final class ExportSession: @unchecked Sendable {
-    // @unchecked Sendable because progress properties are mutable, it's safe though.
+public final class ExportSession: Sendable {
+    public let progressStream: AsyncStream<Float>
 
-    public typealias ProgressStream = AsyncStream<Float>
-
-    public var progressStream: ProgressStream = ProgressStream(unfolding: { 0.0 })
-
-    private var progressContinuation: ProgressStream.Continuation?
+    private let progressContinuation: AsyncStream<Float>.Continuation
 
     public init() {
-        progressStream = AsyncStream { continuation in
-            progressContinuation = continuation
-        }
+        (progressStream, progressContinuation) = AsyncStream<Float>.makeStream()
     }
 
     public func export(
@@ -49,7 +43,7 @@ public final class ExportSession: @unchecked Sendable {
         )
         Task { [progressContinuation] in
             for await progress in await sampleWriter.progressStream {
-                progressContinuation?.yield(progress)
+                progressContinuation.yield(progress)
             }
         }
         try await sampleWriter.writeSamples()
@@ -129,7 +123,7 @@ public final class ExportSession: @unchecked Sendable {
         )
         Task { [progressContinuation] in
             for await progress in await sampleWriter.progressStream {
-                progressContinuation?.yield(progress)
+                progressContinuation.yield(progress)
             }
         }
         try await sampleWriter.writeSamples()
