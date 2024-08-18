@@ -21,7 +21,8 @@ actor SampleWriter {
     )
 
     // Execute this actor on the same queue we use to request media data so we can use
-    // `assumeIsolated` to ensure that we
+    // `assumeIsolated` to ensure that we serialize access to our state without creating
+    // tasks and doing lots of needless context-switching.
     public nonisolated var unownedExecutor: UnownedSerialExecutor {
         queue.asUnownedSerialExecutor()
     }
@@ -228,6 +229,7 @@ actor SampleWriter {
         return await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
                 self.videoInput!.requestMediaDataWhenReady(on: queue) {
+                    #warning("FIXME: why is this broken on macOS?!")
                     self.assumeIsolated { _self in
                         guard !_self.isCancelled else {
                             log.debug("Cancelled while encoding video")
