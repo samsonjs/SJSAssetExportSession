@@ -5,8 +5,8 @@
 //  Created by Sami Samhuri on 2024-08-18.
 //
 
-internal import AVFoundation
-@testable import SJSAssetExportSession
+import AVFoundation
+import SJSAssetExportSession
 
 private func readmeNiceExample() async throws {
     let sourceURL = URL.documentsDirectory.appending(component: "some-video.mov")
@@ -101,7 +101,7 @@ private func readmeFlexibleExample() async throws {
             AVVideoCompressionPropertiesKey: [
                 AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
                 AVVideoAverageBitRateKey: NSNumber(value: 1_000_000),
-            ] as [String: (any Sendable)],
+            ] as [String: any Sendable],
             AVVideoColorPropertiesKey: [
                 AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
                 AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,

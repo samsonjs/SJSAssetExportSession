@@ -16,6 +16,28 @@ public final class ExportSession: Sendable {
         (progressStream, progressContinuation) = AsyncStream<Float>.makeStream()
     }
 
+    /**
+     Exports the given asset using all of the other parameters to transform it in some way. This method uses code to build up audio and video settings with a nice API instead of diving into the nitty gritty settings dictionaries. Monitor progress using ``progressStream``.
+
+     - Parameters:
+       - asset: The source asset to export. This can be any kind of `AVAsset` including subclasses such as `AVComposition`.
+
+       - optimizeForNetworkUse: Setting this value to `true` writes the output file in a form that enables a player to begin playing the media after downloading only a small portion of it. Defaults to `false`.
+
+       - metadata: Optional array of `AVMetadataItem`s to be written out with the exported asset.
+
+       - timeRange: Providing a time range exports a subset of the asset instead of the entire duration, which is the default behaviour.
+
+       - audio: Optional audio settings using ``AudioOutputSettings``. Defaults to ``AudioOutputSettings/default``.
+
+       - video: Video settings using ``VideoOutputSettings``.
+
+       - outputURL: The file `URL` where the exported video will be written.
+
+       - fileType: The type of of video file to export. This will typically be one of `AVFileType.mp4`, `AVFileType.m4v`, or `AVFileType.mov`.
+
+     - Throws: One of the cases in the ``ExportSession/Error`` enum when the export fails. See ``ExportSession/Error`` for possible failures.
+     */
     public func export(
         asset: sending AVAsset,
         optimizeForNetworkUse: Bool = false,
@@ -50,7 +72,7 @@ public final class ExportSession: Sendable {
     }
 
     /**
-     Exports the given asset using all of the other parameters to transform it in some way.
+     Exports the given asset using all of the other parameters to transform it in some way. This method provides the most control over the export using audio and video settings dictionaries, in addition to an optionial audio mix and optional video composition. Monitor progress using ``progressStream``.
 
      - Parameters:
        - asset: The source asset to export. This can be any kind of `AVAsset` including subclasses such as `AVComposition`.
@@ -77,15 +99,17 @@ public final class ExportSession: Sendable {
        - outputURL: The file URL where the exported video will be written.
 
        - fileType: The type of of video file to export. This will typically be one of `AVFileType.mp4`, `AVFileType.m4v`, or `AVFileType.mov`.
+
+     - Throws: One of the cases in the ``ExportSession/Error`` enum when the export fails. See ``ExportSession/Error`` for possible failures.
      */
     public func export(
         asset: sending AVAsset,
         optimizeForNetworkUse: Bool = false,
         metadata: sending [AVMetadataItem] = [],
         timeRange: CMTimeRange? = nil,
-        audioOutputSettings: [String: (any Sendable)],
+        audioOutputSettings: [String: any Sendable],
         mix: sending AVAudioMix? = nil,
-        videoOutputSettings: [String: (any Sendable)],
+        videoOutputSettings: [String: any Sendable],
         composition: sending AVVideoComposition? = nil,
         to outputURL: URL,
         as fileType: AVFileType

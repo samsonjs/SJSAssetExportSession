@@ -32,9 +32,9 @@ actor SampleWriter {
     }
     private var progressContinuation: AsyncStream<Float>.Continuation?
 
-    private let audioOutputSettings: [String: (any Sendable)]
+    private let audioOutputSettings: [String: any Sendable]
     private let audioMix: AVAudioMix?
-    private let videoOutputSettings: [String: (any Sendable)]
+    private let videoOutputSettings: [String: any Sendable]
     private let videoComposition: AVVideoComposition?
     private let reader: AVAssetReader
     private let writer: AVAssetWriter
@@ -48,9 +48,9 @@ actor SampleWriter {
 
     nonisolated init(
         asset: sending AVAsset,
-        audioOutputSettings: sending [String: (any Sendable)],
+        audioOutputSettings: sending [String: any Sendable],
         audioMix: sending AVAudioMix?,
-        videoOutputSettings: sending [String: (any Sendable)],
+        videoOutputSettings: sending [String: any Sendable],
         videoComposition: sending AVVideoComposition,
         timeRange: CMTimeRange? = nil,
         optimizeForNetworkUse: Bool = false,

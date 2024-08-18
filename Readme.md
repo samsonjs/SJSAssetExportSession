@@ -1,25 +1,31 @@
-# Overview
+# SJSAssetExportSession
+
+## Overview
 
 `SJSAssetExportSession` is an alternative to [`AVAssetExportSession`][AV] that lets you provide custom audio and video settings, without dropping down into the world of `AVAssetReader` and `AVAssetWriter`. It has similar capabilites to [SDAVAssetExportSession][SDAV] but the API is completely different, the code is written in Swift, and it's ready for the world of strict concurrency.
 
+You shouldn't have to read through [audio settings][] and [video settings][] just to set the bitrate, and setting the frame rate can be tricky, so there's a nicer API that builds these settings dictionaries with some commonly used settings.
+
 [AV]: https://developer.apple.com/documentation/avfoundation/avassetexportsession
 [SDAV]: https://github.com/rs/SDAVAssetExportSession
+[audio settings]: https://developer.apple.com/documentation/avfoundation/audio_settings
+[video settings]: https://developer.apple.com/documentation/avfoundation/video_settings
 
-# Installation
+## Installation
 
 The only way to install this package is with Swift Package Manager (SPM). Please [file a new issue][] or submit a pull-request if you want to use something else.
 
 [file a new issue]: https://github.com/samsonjs/SJSAssetExportSession/issues/new
 
-## Supported Platforms
+### Supported Platforms
 
 This package is supported on iOS 17.0+, macOS Sonoma 14.0+, and visionOS 1.3+.
 
-## Xcode
+### Xcode
 
 When you're integrating this into an app with Xcode then go to your project's Package Dependencies and enter the URL `https://github.com/samsonjs/SJSAssetExportSession` and then go through the usual flow for adding packages.
 
-## Swift Package Manager (SPM)
+### Swift Package Manager (SPM)
 
 When you're integrating this using SPM on its own then add this to your Package.swift file:
 
@@ -27,11 +33,11 @@ When you're integrating this using SPM on its own then add this to your Package.
 .package(url: "https://github.com/samsonjs/SJSAssetExportSession.git", .upToNextMajor(from: "1.0"))
 ```
 
-# Usage
+## Usage
 
 There are two ways of exporting assets: one using dictionaries for audio and video settings just like with `SDAVAssetExportSession`, and the other using a builder-like API with data structures for commonly used settings.
 
-## The Nice Way
+### The Nice Way
 
 This should be fairly self-explanatory:
 
@@ -58,7 +64,7 @@ try await exporter.export(
 
 Most of the audio and video configuration is optional which is why there are no audio settings specified here. By default you get AAC with 2 channels at a 44.1 KHz sample rate.
 
-## All Nice Parameters
+### All Nice Parameters
 
 Here are all of the parameters you can pass into the nice export method:
 
@@ -94,7 +100,7 @@ try await exporter.export(
     )
 ```
 
-## The Most Flexible Way
+### The Most Flexible Way
 
 When you need all the control you can get down to the nitty gritty details. This code does the exact same thing as the code above:
 
@@ -138,7 +144,7 @@ try await exporter.export(
         AVVideoCompressionPropertiesKey: [
             AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
             AVVideoAverageBitRateKey: NSNumber(value: 1_000_000),
-        ] as [String: (any Sendable)],
+        ] as [String: any Sendable],
         AVVideoColorPropertiesKey: [
             AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
             AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,
@@ -151,13 +157,9 @@ try await exporter.export(
 )
 ```
 
-It's an effective illustration of why the nicer API exists right? You shouldn't have to read through [audio settings][] and [video settings][] just to set the bitrate, and setting the frame rate can be tricky. But when you need this flexibility then it's available for you.
+It's an effective illustration of why the nicer API exists right? But when you need this flexibility then it's available for you.
 
-[audio settings]: https://developer.apple.com/documentation/avfoundation/audio_settings
-
-[video settings]: https://developer.apple.com/documentation/avfoundation/video_settings
-
-## Mix and Match
+### Mix and Match
 
 `AudioOutputSettings` and `VideoOutputSettings` have a property named `settingsDictionary` and you can use that to bootstrap your own custom settings.
 
@@ -188,7 +190,7 @@ try await exporter.export(
 )
 ```
 
-# License
+## License
 
 Copyright © 2024 Sami Samhuri, https://samhuri.net <sami@samhuri.net>. Released under the terms of the [MIT License][MIT].
 

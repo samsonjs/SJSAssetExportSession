@@ -5,9 +5,9 @@
 //  Created by Sami Samhuri on 2024-06-29.
 //
 
-internal import AVFoundation
+import AVFoundation
 import CoreLocation
-@testable import SJSAssetExportSession
+import SJSAssetExportSession
 import Testing
 
 final class ExportSessionTests {

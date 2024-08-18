@@ -7,7 +7,13 @@
 
 import AVFoundation
 
+/// A convenient API for constructing video settings dictionaries.
+///
+/// Construct this by starting with ``VideoOutputSettings/codec(_:size:)`` or ``VideoOutputSettings/codec(_:width:height:)`` and then chaining calls to further customize it, if desired, using ``fps(_:)``, ``bitrate(_:)``, and ``color(_:)``.
+///
+/// Setting the fps and colour also needs support from the `AVVideoComposition` and these settings can be applied to them with ``VideoOutputSettings/apply(to:)``.
 public struct VideoOutputSettings {
+    /// Describes an H.264 encoding profile.
     public enum H264Profile {
         case baselineAuto, baseline30, baseline31, baseline41
         case mainAuto, main31, main32, main41
@@ -30,11 +36,15 @@ public struct VideoOutputSettings {
         }
     }
 
+    /// Specifies the output codec.
     public enum Codec {
+        /// H.264 using the associated encoding profile.
         case h264(H264Profile)
+        /// HEVC / H.265
         case hevc
 
-        static var h264: Codec {
+        /// Construct Codec.h264 using the default profile `H264Profile.highAuto`.
+        public static var h264: Codec {
             .h264(.highAuto)
         }
 
@@ -53,8 +63,12 @@ public struct VideoOutputSettings {
         }
     }
 
+    /// Specifies whether to use Standard Dynamic Range or High Dynamic Range colours.
     public enum Color {
-        case sdr, hdr
+        /// Standard dynamic range colours (BT.709 which roughly corresponds to SRGB)
+        case sdr
+        /// High dynamic range colours (BT.2020)
+        case hdr
 
         var properties: [String: any Sendable] {
             switch self {
@@ -100,7 +114,7 @@ public struct VideoOutputSettings {
         .init(codec: codec, size: size, fps: fps, bitrate: bitrate, color: color)
     }
 
-    var settingsDictionary: [String: any Sendable] {
+    public var settingsDictionary: [String: any Sendable] {
         var result: [String: any Sendable] = [
             AVVideoCodecKey: codec.stringValue,
             AVVideoWidthKey: NSNumber(value: Int(size.width)),
@@ -120,6 +134,11 @@ public struct VideoOutputSettings {
             result[AVVideoColorPropertiesKey] = color.properties
         }
         return result
+    }
+
+    /// Applies the subset of relevant settings to the given video composition, namely fps and colour.
+    public func apply(to videoComposition: AVMutableVideoComposition) {
+        _ = videoComposition.applyingSettings(self)
     }
 }
 
