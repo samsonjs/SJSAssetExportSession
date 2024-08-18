@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		7B4C031A2C7256760091C5DB /* ReadmeExamples.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B4C03192C7256760091C5DB /* ReadmeExamples.swift */; };
 		7B7AE3092C36615700DB7391 /* SampleWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B7AE3082C36615700DB7391 /* SampleWriter.swift */; };
 		7B9867982C6AF57C001353BC /* AVAsset+sending.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BC5FC8B2C3BB0180090B757 /* AVAsset+sending.swift */; };
 		7B9BC00E2C305D2C00C160C2 /* SJSAssetExportSession.docc in Sources */ = {isa = PBXBuildFile; fileRef = 7B9BC00D2C305D2C00C160C2 /* SJSAssetExportSession.docc */; };
@@ -33,6 +34,9 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		7B4C03172C723EA40091C5DB /* License.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = License.md; sourceTree = "<group>"; };
+		7B4C03182C723F3B0091C5DB /* Readme.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = Readme.md; sourceTree = "<group>"; };
+		7B4C03192C7256760091C5DB /* ReadmeExamples.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadmeExamples.swift; sourceTree = "<group>"; };
 		7B7AE3082C36615700DB7391 /* SampleWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleWriter.swift; sourceTree = "<group>"; };
 		7B9BC0092C305D2C00C160C2 /* SJSAssetExportSession.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = SJSAssetExportSession.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		7B9BC00C2C305D2C00C160C2 /* SJSAssetExportSession.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SJSAssetExportSession.h; sourceTree = "<group>"; };
@@ -75,6 +79,8 @@
 		7B9BBFFF2C305D2C00C160C2 = {
 			isa = PBXGroup;
 			children = (
+				7B4C03172C723EA40091C5DB /* License.md */,
+				7B4C03182C723F3B0091C5DB /* Readme.md */,
 				7B9BC00B2C305D2C00C160C2 /* SJSAssetExportSession */,
 				7B9BC0172C305D2C00C160C2 /* SJSAssetExportSessionTests */,
 				7B9BC00A2C305D2C00C160C2 /* Products */,
@@ -108,6 +114,7 @@
 		7B9BC0172C305D2C00C160C2 /* SJSAssetExportSessionTests */ = {
 			isa = PBXGroup;
 			children = (
+				7B4C03192C7256760091C5DB /* ReadmeExamples.swift */,
 				7BC5FC782C3B90F70090B757 /* AutoDestructingURL.swift */,
 				7BC5FC8B2C3BB0180090B757 /* AVAsset+sending.swift */,
 				7BC5FC812C3B9E3D0090B757 /* Resources */,
@@ -246,6 +253,7 @@
 				7B9BC0192C305D2C00C160C2 /* SJSAssetExportSessionTests.swift in Sources */,
 				7BC5FC792C3B90F70090B757 /* AutoDestructingURL.swift in Sources */,
 				7B9867982C6AF57C001353BC /* AVAsset+sending.swift in Sources */,
+				7B4C031A2C7256760091C5DB /* ReadmeExamples.swift in Sources */,
 				7BC5FC772C3B8C5A0090B757 /* SendableWrapper.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
