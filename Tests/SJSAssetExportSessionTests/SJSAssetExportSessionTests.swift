@@ -11,8 +11,8 @@ import SJSAssetExportSession
 import Testing
 
 final class ExportSessionTests {
-    private func resourceURL(named name: String, withExtension ext: String) -> URL {
-        Bundle(for: Self.self).url(forResource: name, withExtension: ext)!
+    private func resourceURL(named name: String) -> URL {
+        Bundle.module.resourceURL!.appending(component: name)
     }
 
     private func makeAsset(url: URL) -> sending AVAsset {
@@ -50,7 +50,7 @@ final class ExportSessionTests {
     }
 
     @Test func test_sugary_export_720p_h264_24fps() async throws {
-        let sourceURL = resourceURL(named: "test-4k-hdr-hevc-30fps", withExtension: "mov")
+        let sourceURL = resourceURL(named: "test-4k-hdr-hevc-30fps.mov")
         let destinationURL = makeTemporaryURL()
 
         let subject = ExportSession()
@@ -90,7 +90,7 @@ final class ExportSessionTests {
     }
 
     @Test func test_export_720p_h264_24fps() async throws {
-        let sourceURL = resourceURL(named: "test-4k-hdr-hevc-30fps", withExtension: "mov")
+        let sourceURL = resourceURL(named: "test-4k-hdr-hevc-30fps.mov")
         let videoComposition = try await makeVideoComposition(
             assetURL: sourceURL,
             size: CGSize(width: 1280, height: 720),
@@ -138,7 +138,7 @@ final class ExportSessionTests {
     }
 
     @Test func test_export_default_timerange() async throws {
-        let sourceURL = resourceURL(named: "test-720p-h264-24fps", withExtension: "mov")
+        let sourceURL = resourceURL(named: "test-720p-h264-24fps.mov")
         let destinationURL = makeTemporaryURL()
 
         let subject = ExportSession()
@@ -154,7 +154,7 @@ final class ExportSessionTests {
     }
 
     @Test func test_export_default_composition_with_size() async throws {
-        let sourceURL = resourceURL(named: "test-720p-h264-24fps", withExtension: "mov")
+        let sourceURL = resourceURL(named: "test-720p-h264-24fps.mov")
         let size = CGSize(width: 640, height: 360)
         let destinationURL = makeTemporaryURL()
 
@@ -173,7 +173,7 @@ final class ExportSessionTests {
     }
 
     @Test func test_export_default_composition_without_size() async throws {
-        let sourceURL = resourceURL(named: "test-720p-h264-24fps", withExtension: "mov")
+        let sourceURL = resourceURL(named: "test-720p-h264-24fps.mov")
         let destinationURL = makeTemporaryURL()
 
         let subject = ExportSession()
@@ -191,7 +191,7 @@ final class ExportSessionTests {
     }
 
     @Test func test_export_progress() async throws {
-        let sourceURL = resourceURL(named: "test-720p-h264-24fps", withExtension: "mov")
+        let sourceURL = resourceURL(named: "test-720p-h264-24fps.mov")
         let progressValues = SendableWrapper<[Float]>([])
 
         let subject = ExportSession()
@@ -213,7 +213,7 @@ final class ExportSessionTests {
     }
 
     @Test func test_export_works_with_no_audio() async throws {
-        let sourceURL = resourceURL(named: "test-no-audio", withExtension: "mp4")
+        let sourceURL = resourceURL(named: "test-no-audio.mp4")
         let videoComposition = try await makeVideoComposition(assetURL: sourceURL)
 
         let subject = ExportSession()
@@ -230,7 +230,7 @@ final class ExportSessionTests {
 
     @Test func test_export_throws_with_empty_audio_settings() async throws {
         try await #require(throws: ExportSession.Error.setupFailure(.audioSettingsEmpty)) {
-            let sourceURL = resourceURL(named: "test-720p-h264-24fps", withExtension: "mov")
+            let sourceURL = resourceURL(named: "test-720p-h264-24fps.mov")
             let videoComposition = try await makeVideoComposition(assetURL: sourceURL)
 
             let subject = ExportSession()
@@ -248,7 +248,7 @@ final class ExportSessionTests {
 
     @Test func test_export_throws_with_invalid_audio_settings() async throws {
         try await #require(throws: ExportSession.Error.setupFailure(.audioSettingsInvalid)) {
-            let sourceURL = resourceURL(named: "test-720p-h264-24fps", withExtension: "mov")
+            let sourceURL = resourceURL(named: "test-720p-h264-24fps.mov")
 
             let subject = ExportSession()
             try await subject.export(
@@ -267,7 +267,7 @@ final class ExportSessionTests {
 
     @Test func test_export_throws_with_invalid_video_settings() async throws {
         try await #require(throws: ExportSession.Error.setupFailure(.videoSettingsInvalid)) {
-            let sourceURL = resourceURL(named: "test-720p-h264-24fps", withExtension: "mov")
+            let sourceURL = resourceURL(named: "test-720p-h264-24fps.mov")
             let size = CGSize(width: 1280, height: 720)
 
             let subject = ExportSession()
@@ -288,7 +288,7 @@ final class ExportSessionTests {
 
     @Test func test_export_throws_with_no_video_track() async throws {
         try await #require(throws: ExportSession.Error.setupFailure(.videoTracksEmpty)) {
-            let sourceURL = resourceURL(named: "test-no-video", withExtension: "m4a")
+            let sourceURL = resourceURL(named: "test-no-video.m4a")
             let subject = ExportSession()
             try await subject.export(
                 asset: makeAsset(url: sourceURL),
@@ -300,7 +300,7 @@ final class ExportSessionTests {
     }
 
     @Test func test_export_cancellation() async throws {
-        let sourceURL = resourceURL(named: "test-720p-h264-24fps", withExtension: "mov")
+        let sourceURL = resourceURL(named: "test-720p-h264-24fps.mov")
         let destinationURL💥 = makeTemporaryURL()
         let task = Task {
             let sourceAsset = AVURLAsset(url: sourceURL, options: [
@@ -324,7 +324,7 @@ final class ExportSessionTests {
     }
 
     @Test func test_writing_metadata() async throws {
-        let sourceURL = resourceURL(named: "test-720p-h264-24fps", withExtension: "mov")
+        let sourceURL = resourceURL(named: "test-720p-h264-24fps.mov")
         let destinationURL = makeTemporaryURL()
         let locationMetadata = AVMutableMetadataItem()
         locationMetadata.key = AVMetadataKey.commonKeyLocation.rawValue as NSString
