@@ -60,8 +60,11 @@ actor SampleWriter {
     ) async throws {
         precondition(!videoOutputSettings.isEmpty)
 
-        let duration =
-        if let timeRange { timeRange.duration } else { try await asset.load(.duration) }
+        let duration = if let timeRange {
+            timeRange.duration
+        } else {
+            try await asset.load(.duration)
+        }
         let reader = try AVAssetReader(asset: asset)
         if let timeRange {
             reader.timeRange = timeRange
