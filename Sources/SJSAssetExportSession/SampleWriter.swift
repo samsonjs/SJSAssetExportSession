@@ -70,12 +70,16 @@ actor SampleWriter {
         writer.shouldOptimizeForNetworkUse = optimizeForNetworkUse
         writer.metadata = metadata
 
+        // Filter out disabled tracks to avoid problems encoding spatial audio. Ideally this would
+        // preserve track groups and make that all configurable.
         let audioTracks = try await asset.loadTracks(withMediaType: .audio)
+            .filterAsync { try await $0.load(.isEnabled) }
         // Audio is optional so only validate output settings when it's applicable.
         if !audioTracks.isEmpty {
             try Self.validateAudio(outputSettings: audioOutputSettings, writer: writer)
         }
         let videoTracks = try await asset.loadTracks(withMediaType: .video)
+            .filterAsync { try await $0.load(.isEnabled) }
         guard !videoTracks.isEmpty else { throw Error.setupFailure(.videoTracksEmpty) }
         try Self.validateVideo(outputSettings: videoOutputSettings, writer: writer)
         Self.warnAboutMismatchedVideoSize(
