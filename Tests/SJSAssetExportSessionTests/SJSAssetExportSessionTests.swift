@@ -357,4 +357,21 @@ final class ExportSessionTests {
         })?.load(.value) as? NSString
         #expect(commonMetadataValue == "+48.50176+123.34368/")
     }
+
+    @Test func test_works_with_spatial_audio_track() async throws {
+        let sourceURL = resourceURL(named: "test-spatial-audio.mov")
+        let destinationURL = makeTemporaryURL()
+
+        let subject = ExportSession()
+        try await subject.export(
+            asset: makeAsset(url: sourceURL),
+            video: .codec(.h264, size: CGSize(width: 720, height: 1280)),
+            to: destinationURL.url,
+            as: .mp4
+        )
+
+        let exportedAsset = AVURLAsset(url: destinationURL.url)
+        let audioTracks = try await exportedAsset.loadTracks(withMediaType: .audio)
+        #expect(audioTracks.count == 1)
+    }
 }
