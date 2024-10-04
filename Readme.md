@@ -30,7 +30,7 @@ When you're integrating this into an app with Xcode then go to your project's Pa
 When you're integrating this using SPM on its own then add this to your Package.swift file:
 
 ```swift
-.package(url: "https://github.com/samsonjs/SJSAssetExportSession.git", .upToNextMajor(from: "1.0"))
+.package(url: "https://github.com/samsonjs/SJSAssetExportSession.git", .upToNextMajor(from: "0.2"))
 ```
 
 ## Usage
