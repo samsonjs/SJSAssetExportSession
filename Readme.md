@@ -27,11 +27,13 @@ When you're integrating this into an app with Xcode then go to your project's Pa
 
 ### Swift Package Manager (SPM)
 
-When you're integrating this using SPM on its own then add this to your Package.swift file:
+When you're integrating this using SPM on its own then add this to the list of dependencies your Package.swift file:
 
 ```swift
-.package(url: "https://github.com/samsonjs/SJSAssetExportSession.git", .upToNextMajor(from: "0.2"))
+.package(url: "https://github.com/samsonjs/SJSAssetExportSession.git", .upToNextMajor(from: "0.2.0"))
 ```
+
+and then add `"SJSAssetExportSession"` to all of the lists of dependencies in your target as well.
 
 ## Usage
 
