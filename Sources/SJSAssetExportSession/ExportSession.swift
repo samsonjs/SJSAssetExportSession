@@ -30,6 +30,8 @@ public final class ExportSession: Sendable {
 
        - audio: Optional audio settings using ``AudioOutputSettings``. Defaults to ``AudioOutputSettings/default``.
 
+       - mix: An optional mix that can be used to manipulate the audio in some way.
+
        - video: Video settings using ``VideoOutputSettings``.
 
        - outputURL: The file `URL` where the exported video will be written.
@@ -44,6 +46,7 @@ public final class ExportSession: Sendable {
         metadata: sending [AVMetadataItem] = [],
         timeRange: CMTimeRange? = nil,
         audio: sending AudioOutputSettings = .default,
+        mix: sending AVAudioMix? = nil,
         video: sending VideoOutputSettings,
         to outputURL: URL,
         as fileType: AVFileType
@@ -54,7 +57,7 @@ public final class ExportSession: Sendable {
         let sampleWriter = try await SampleWriter(
             asset: asset,
             audioOutputSettings: audio.settingsDictionary,
-            audioMix: audio.mix,
+            audioMix: mix,
             videoOutputSettings: video.settingsDictionary,
             videoComposition: videoComposition,
             timeRange: timeRange,
