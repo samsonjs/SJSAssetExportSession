@@ -33,7 +33,7 @@ When you're integrating this using SPM on its own then add this to the list of d
 .package(url: "https://github.com/samsonjs/SJSAssetExportSession.git", .upToNextMajor(from: "0.2.0"))
 ```
 
-and then add `"SJSAssetExportSession"` to all of the lists of dependencies in your target as well.
+and then add `"SJSAssetExportSession"` to the list of dependencies in your target as well.
 
 ## Usage
 
