@@ -26,9 +26,9 @@ public struct AudioOutputSettings: Hashable, Sendable, Codable {
         }
     }
 
-    let format: AudioFormatID
-    let channels: Int
-    let sampleRate: Int?
+    public let format: AudioFormatID
+    public let channels: Int
+    public let sampleRate: Int?
 
     /// Specifies the AAC format with 2 channels at a 44.1 KHz sample rate.
     public static var `default`: AudioOutputSettings {

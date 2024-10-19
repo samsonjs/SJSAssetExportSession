@@ -88,11 +88,11 @@ public struct VideoOutputSettings: Hashable, Sendable, Codable {
         }
     }
 
-    let codec: Codec
-    let size: CGSize
-    let fps: Int?
-    let bitrate: Int?
-    let color: Color?
+    public let codec: Codec
+    public let size: CGSize
+    public let fps: Int?
+    public let bitrate: Int?
+    public let color: Color?
 
     public static func codec(_ codec: Codec, size: CGSize) -> VideoOutputSettings {
         .init(codec: codec, size: size, fps: nil, bitrate: nil, color: nil)
