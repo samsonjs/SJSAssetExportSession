@@ -32,14 +32,19 @@ actor SampleWriter {
     }
     private var progressContinuation: AsyncStream<Float>.Continuation?
 
+    // MARK: Inputs
+
     private let audioOutputSettings: [String: any Sendable]
     private let audioMix: AVAudioMix?
     private let videoOutputSettings: [String: any Sendable]
     private let videoComposition: AVVideoComposition?
-    private let reader: AVAssetReader
-    private let writer: AVAssetWriter
     private let duration: CMTime
     private let timeRange: CMTimeRange
+
+    // MARK: Internal state
+
+    private let reader: AVAssetReader
+    private let writer: AVAssetWriter
     private var audioOutput: AVAssetReaderAudioMixOutput?
     private var audioInput: AVAssetWriterInput?
     private var videoOutput: AVAssetReaderVideoCompositionOutput?
@@ -204,9 +209,11 @@ actor SampleWriter {
 
     private func encodeAudioTracks() async {
         // Don't do anything when we have no audio to encode.
-        guard audioInput != nil, audioOutput != nil else { return }
+        guard audioInput != nil, audioOutput != nil else {
+            return
+        }
 
-        return await withTaskCancellationHandler {
+        await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
                 self.audioInput!.requestMediaDataWhenReady(on: queue) {
                     self.assumeIsolated { _self in
@@ -238,10 +245,10 @@ actor SampleWriter {
     }
 
     private func encodeVideoTracks() async {
-        return await withTaskCancellationHandler {
+        await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
                 self.videoInput!.requestMediaDataWhenReady(on: queue) {
-                    #warning("FIXME: why is this broken on macOS?!")
+                    // NOTE: assumeIsolated crashes on macOS at the moment
                     self.assumeIsolated { _self in
                         guard !_self.isCancelled else {
                             log.debug("Cancelled while encoding video")
@@ -287,8 +294,8 @@ actor SampleWriter {
 
             guard input.append(sampleBuffer) else {
                 log.error("""
-                    Failed to append audio sample buffer \(String(describing: sampleBuffer)) to
-                    input \(input.debugDescription)
+                    Failed to append sample buffer \(String(describing: sampleBuffer)) to input
+                    \(input.debugDescription)
                 """)
                 return false
             }
