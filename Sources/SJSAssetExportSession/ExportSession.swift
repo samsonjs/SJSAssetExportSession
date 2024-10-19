@@ -67,7 +67,7 @@ public final class ExportSession: Sendable {
             fileType: fileType
         )
         Task { [progressContinuation] in
-            for await progress in await sampleWriter.progressStream {
+            for await progress in sampleWriter.progressStream {
                 progressContinuation.yield(progress)
             }
         }
@@ -149,7 +149,7 @@ public final class ExportSession: Sendable {
             fileType: fileType
         )
         Task { [progressContinuation] in
-            for await progress in await sampleWriter.progressStream {
+            for await progress in sampleWriter.progressStream {
                 progressContinuation.yield(progress)
             }
         }

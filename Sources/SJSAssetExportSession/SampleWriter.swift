@@ -27,10 +27,9 @@ actor SampleWriter {
         queue.asUnownedSerialExecutor()
     }
 
-    lazy var progressStream: AsyncStream<Float> = AsyncStream { continuation in
-        progressContinuation = continuation
-    }
-    private var progressContinuation: AsyncStream<Float>.Continuation?
+    let progressStream: AsyncStream<Float>
+
+    private let progressContinuation: AsyncStream<Float>.Continuation
 
     // MARK: Inputs
 
@@ -64,6 +63,8 @@ actor SampleWriter {
         fileType: AVFileType
     ) async throws {
         precondition(!videoOutputSettings.isEmpty)
+
+        (progressStream, progressContinuation) = AsyncStream<Float>.makeStream()
 
         let duration = if let timeRange {
             timeRange.duration
@@ -111,7 +112,7 @@ actor SampleWriter {
     func writeSamples() async throws {
         try Task.checkCancellation()
 
-        progressContinuation?.yield(0.0)
+        progressContinuation.yield(0.0)
 
         writer.startWriting()
         writer.startSession(atSourceTime: timeRange.start)
@@ -142,14 +143,14 @@ actor SampleWriter {
             }
         }
 
-        progressContinuation?.yield(1.0)
+        progressContinuation.yield(1.0)
 
         // Make sure the last progress value is yielded before returning.
         await withCheckedContinuation { continuation in
-            progressContinuation?.onTermination = { _ in
+            progressContinuation.onTermination = { _ in
                 continuation.resume(returning: ())
             }
-            progressContinuation?.finish()
+            progressContinuation.finish()
         }
     }
 
@@ -288,7 +289,7 @@ actor SampleWriter {
             if output == videoOutput {
                 let samplePresentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer) - timeRange.start
                 let progress = Float(samplePresentationTime.seconds / duration.seconds)
-                progressContinuation?.yield(progress)
+                progressContinuation.yield(progress)
             }
 
             guard input.append(sampleBuffer) else {
