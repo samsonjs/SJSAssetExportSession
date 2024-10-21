@@ -207,6 +207,8 @@ final class ExportSessionTests {
             as: .mov
         )
 
+        // Wait for last progress value to be yielded.
+        try await Task.sleep(for: .milliseconds(10))
         #expect(progressValues.value.count > 2, "There should be intermediate progress updates")
         #expect(progressValues.value.first == 0.0)
         #expect(progressValues.value.last == 1.0)
