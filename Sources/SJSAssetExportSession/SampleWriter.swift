@@ -37,7 +37,6 @@ actor SampleWriter {
     private let audioMix: AVAudioMix?
     private let videoOutputSettings: [String: any Sendable]
     private let videoComposition: AVVideoComposition?
-    private let duration: CMTime
     private let timeRange: CMTimeRange
 
     // MARK: Internal state
@@ -66,11 +65,6 @@ actor SampleWriter {
 
         (progressStream, progressContinuation) = AsyncStream<Float>.makeStream()
 
-        let duration = if let timeRange {
-            timeRange.duration
-        } else {
-            try await asset.load(.duration)
-        }
         let reader = try AVAssetReader(asset: asset)
         if let timeRange {
             reader.timeRange = timeRange
@@ -102,8 +96,11 @@ actor SampleWriter {
         self.videoComposition = videoComposition
         self.reader = reader
         self.writer = writer
-        self.duration = duration
-        self.timeRange = timeRange ?? CMTimeRange(start: .zero, duration: duration)
+        self.timeRange = if let timeRange {
+            timeRange
+        } else {
+            try await CMTimeRange(start: .zero, duration: asset.load(.duration))
+        }
 
         try await setUpAudio(audioTracks: audioTracks)
         try await setUpVideo(videoTracks: videoTracks)
@@ -287,8 +284,9 @@ actor SampleWriter {
 
             // Only yield progress values for video. Audio is insignificant in comparison.
             if output == videoOutput {
-                let samplePresentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer) - timeRange.start
-                let progress = Float(samplePresentationTime.seconds / duration.seconds)
+                let endTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+                let samplePresentationTime = endTime - timeRange.start
+                let progress = Float(samplePresentationTime.seconds / timeRange.duration.seconds)
                 progressContinuation.yield(progress)
             }
 
