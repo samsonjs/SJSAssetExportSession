@@ -1,5 +1,8 @@
 # SJSAssetExportSession
 
+[![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fsamsonjs%2FSJSAssetExportSession%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/samsonjs/SJSAssetExportSession)
+[![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fsamsonjs%2FSJSAssetExportSession%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/samsonjs/SJSAssetExportSession)
+
 ## Overview
 
 `SJSAssetExportSession` is an alternative to [`AVAssetExportSession`][AV] that lets you provide custom audio and video settings, without dropping down into the world of `AVAssetReader` and `AVAssetWriter`. It has similar capabilites to [SDAVAssetExportSession][SDAV] but the API is completely different, the code is written in Swift, and it's ready for the world of strict concurrency.
