@@ -192,6 +192,34 @@ final class ExportSessionTests {
         #expect(try await exportedTrack.load(.naturalSize) == CGSize(width: 1280, height: 720))
     }
 
+    @Test func test_export_x264_60fps() async throws {
+        let sourceURL = resourceURL(named: "test-x264-1080p-h264-60fps.mp4")
+        let destinationURL = makeTemporaryURL()
+
+        let subject = ExportSession()
+        try await subject.export(
+            asset: makeAsset(url: sourceURL),
+            video: .codec(.h264, width: 1920, height: 1080)
+                .bitrate(2_500_000)
+                .fps(30),
+            to: destinationURL.url,
+            as: .mp4
+        )
+
+        let exportedAsset = AVURLAsset(url: destinationURL.url)
+        let videoTrack = try #require(await exportedAsset.sendTracks(withMediaType: .video).first)
+        #expect(try await videoTrack.load(.naturalSize) == CGSize(width: 1920, height: 1080))
+        #expect(try await videoTrack.load(.nominalFrameRate) == 30.0)
+        let dataRate = try await videoTrack.load(.estimatedDataRate)
+        #expect((2_400_000 ... 2_700_000).contains(dataRate))
+        let videoFormat = try #require(await videoTrack.load(.formatDescriptions).first)
+        #expect(videoFormat.mediaType == .video)
+        #expect(videoFormat.mediaSubType == .h264)
+        #expect(videoFormat.extensions[.colorPrimaries] == .colorPrimaries(.itu_R_709_2))
+        #expect(videoFormat.extensions[.transferFunction] == .transferFunction(.itu_R_709_2))
+        #expect(videoFormat.extensions[.yCbCrMatrix] == .yCbCrMatrix(.itu_R_709_2))
+    }
+
     @Test func test_export_progress() async throws {
         let sourceURL = resourceURL(named: "test-720p-h264-24fps.mov")
         let progressValues = SendableWrapper<[Float]>([])
