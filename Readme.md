@@ -34,7 +34,7 @@ When you're integrating this into an app with Xcode then go to your project's Pa
 When you're integrating this using SPM on its own then add this to the list of dependencies your Package.swift file:
 
 ```swift
-.package(url: "https://github.com/samsonjs/SJSAssetExportSession.git", .upToNextMajor(from: "0.3.3"))
+.package(url: "https://github.com/samsonjs/SJSAssetExportSession.git", .upToNextMajor(from: "0.3.4"))
 ```
 
 and then add `"SJSAssetExportSession"` to the list of dependencies in your target as well.
