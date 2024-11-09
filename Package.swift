@@ -24,6 +24,7 @@ let package = Package(
                 .process("Resources/test-no-audio.mp4"),
                 .process("Resources/test-no-video.m4a"),
                 .process("Resources/test-spatial-audio.mov"),
+                .process("Resources/test-x264-1080p-h264-60fps.mp4"),
             ]
         ),
     ]
