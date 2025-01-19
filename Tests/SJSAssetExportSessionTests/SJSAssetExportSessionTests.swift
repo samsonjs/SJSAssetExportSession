@@ -10,45 +10,7 @@ import CoreLocation
 import SJSAssetExportSession
 import Testing
 
-final class ExportSessionTests {
-    private func resourceURL(named name: String) -> URL {
-        Bundle.module.resourceURL!.appending(component: name)
-    }
-
-    private func makeAsset(url: URL) -> sending AVAsset {
-        AVURLAsset(url: url, options: [
-            AVURLAssetPreferPreciseDurationAndTimingKey: true,
-        ])
-    }
-
-    private func makeTemporaryURL(function: String = #function) -> AutoDestructingURL {
-        let timestamp = Int(Date.now.timeIntervalSince1970)
-        let f = function.replacing(/[\(\)]/, with: { _ in "" })
-        let filename = "\(Self.self)_\(f)_\(timestamp).mp4"
-        let url = URL.temporaryDirectory.appending(component: filename)
-        return AutoDestructingURL(url: url)
-    }
-
-    private func makeVideoComposition(
-        assetURL: URL,
-        size: CGSize? = nil,
-        fps: Int? = nil
-    ) async throws -> sending AVMutableVideoComposition {
-        let asset = makeAsset(url: assetURL)
-        let videoComposition = try await AVMutableVideoComposition.videoComposition(
-            withPropertiesOf: asset
-        )
-        if let size {
-            videoComposition.renderSize = size
-        }
-        if let fps {
-            let seconds = 1.0 / TimeInterval(fps)
-            videoComposition.sourceTrackIDForFrameTiming = kCMPersistentTrackID_Invalid
-            videoComposition.frameDuration = CMTime(seconds: seconds, preferredTimescale: 600)
-        }
-        return videoComposition
-    }
-
+final class ExportSessionTests: BaseTests {
     @Test func test_sugary_export_720p_h264_24fps() async throws {
         let sourceURL = resourceURL(named: "test-4k-hdr-hevc-30fps.mov")
         let destinationURL = makeTemporaryURL()
