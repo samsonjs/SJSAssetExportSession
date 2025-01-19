@@ -129,7 +129,10 @@ actor SampleWriter {
             try await Task.sleep(for: .milliseconds(10))
         }
 
-        guard reader.status != .cancelled && writer.status != .cancelled else {
+        guard !isCancelled, reader.status != .cancelled, writer.status != .cancelled else {
+            log.debug("Cancelled before writing samples")
+            reader.cancelReading()
+            writer.cancelWriting()
             throw CancellationError()
         }
         guard writer.status != .failed else {
@@ -253,6 +256,12 @@ actor SampleWriter {
 
     private func writeReadySamples(output: AVAssetReaderOutput, input: AVAssetWriterInput) -> Bool {
         while input.isReadyForMoreMediaData {
+            guard !isCancelled else {
+                log.debug("Cancelled while writing samples")
+                reader.cancelReading()
+                writer.cancelWriting()
+                return false
+            }
             guard reader.status == .reading && writer.status == .writing,
                   let sampleBuffer = output.copyNextSampleBuffer() else {
                 input.markAsFinished()
