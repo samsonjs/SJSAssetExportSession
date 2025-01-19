@@ -41,8 +41,8 @@ actor SampleWriter {
 
     // MARK: Internal state
 
-    private var reader: AVAssetReader?
-    private var writer: AVAssetWriter?
+    private let reader: AVAssetReader
+    private let writer: AVAssetWriter
     private var audioOutput: AVAssetReaderAudioMixOutput?
     private var audioInput: AVAssetWriterInput?
     private var videoOutput: AVAssetReaderVideoCompositionOutput?
@@ -111,15 +111,15 @@ actor SampleWriter {
 
         progressContinuation.yield(0.0)
 
-        writer?.startWriting()
-        writer?.startSession(atSourceTime: timeRange.start)
-        reader?.startReading()
+        writer.startWriting()
+        writer.startSession(atSourceTime: timeRange.start)
+        reader.startReading()
         try Task.checkCancellation()
 
         startEncodingAudioTracks()
         startEncodingVideoTracks()
 
-        while reader?.status == .reading, writer?.status == .writing {
+        while reader.status == .reading, writer.status == .writing {
             guard !Task.isCancelled else {
                 // Flag so that we stop writing samples
                 isCancelled = true
@@ -129,29 +129,24 @@ actor SampleWriter {
             try await Task.sleep(for: .milliseconds(10))
         }
 
-        defer {
-            cleanUp()
-        }
-
-        guard !isCancelled, reader?.status != .cancelled, writer?.status != .cancelled else {
+        guard !isCancelled, reader.status != .cancelled, writer.status != .cancelled else {
             log.debug("Cancelled before writing samples")
-            cancelReaderAndWriter()
+            reader.cancelReading()
+            writer.cancelWriting()
             throw CancellationError()
         }
-        guard writer?.status != .failed else {
-            reader?.cancelReading()
-            throw Error.writeFailure(writer?.error)
+        guard writer.status != .failed else {
+            reader.cancelReading()
+            throw Error.writeFailure(writer.error)
         }
-        guard reader?.status != .failed else {
-            writer?.cancelWriting()
-            throw Error.readFailure(reader?.error)
+        guard reader.status != .failed else {
+            writer.cancelWriting()
+            throw Error.readFailure(reader.error)
         }
 
-        if let writer {
-            await withCheckedContinuation { continuation in
-                writer.finishWriting {
-                    continuation.resume(returning: ())
-                }
+        await withCheckedContinuation { continuation in
+            writer.finishWriting {
+                continuation.resume(returning: ())
             }
         }
 
@@ -174,7 +169,7 @@ actor SampleWriter {
         let audioOutput = AVAssetReaderAudioMixOutput(audioTracks: audioTracks, audioSettings: nil)
         audioOutput.alwaysCopiesSampleData = false
         audioOutput.audioMix = audioMix
-        guard let reader, reader.canAdd(audioOutput) else {
+        guard reader.canAdd(audioOutput) else {
             throw Error.setupFailure(.cannotAddAudioOutput)
         }
         reader.add(audioOutput)
@@ -182,7 +177,7 @@ actor SampleWriter {
 
         let audioInput = AVAssetWriterInput(mediaType: .audio, outputSettings: audioOutputSettings)
         audioInput.expectsMediaDataInRealTime = false
-        guard let writer, writer.canAdd(audioInput) else {
+        guard writer.canAdd(audioInput) else {
             throw Error.setupFailure(.cannotAddAudioInput)
         }
         writer.add(audioInput)
@@ -198,7 +193,7 @@ actor SampleWriter {
         )
         videoOutput.alwaysCopiesSampleData = false
         videoOutput.videoComposition = videoComposition
-        guard let reader, reader.canAdd(videoOutput) else {
+        guard reader.canAdd(videoOutput) else {
             throw Error.setupFailure(.cannotAddVideoOutput)
         }
         reader.add(videoOutput)
@@ -206,7 +201,7 @@ actor SampleWriter {
 
         let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoOutputSettings)
         videoInput.expectsMediaDataInRealTime = false
-        guard let writer, writer.canAdd(videoInput) else {
+        guard writer.canAdd(videoInput) else {
             throw Error.setupFailure(.cannotAddVideoInput)
         }
         writer.add(videoInput)
@@ -238,25 +233,11 @@ actor SampleWriter {
         }
     }
 
-    private func cancelReaderAndWriter() {
-        reader?.cancelReading()
-        writer?.cancelWriting()
-        cleanUp()
-    }
-
-    private func cleanUp() {
-        reader = nil
-        writer = nil
-        audioInput = nil
-        audioOutput = nil
-        videoInput = nil
-        videoOutput = nil
-    }
-
     private func writeAllReadySamples() {
         guard !isCancelled else {
             log.debug("Cancelled while writing samples")
-            cancelReaderAndWriter()
+            reader.cancelReading()
+            writer.cancelWriting()
             return
         }
 
@@ -273,10 +254,11 @@ actor SampleWriter {
         while input.isReadyForMoreMediaData {
             guard !isCancelled else {
                 log.debug("Cancelled while writing samples")
-                cancelReaderAndWriter()
+                reader.cancelReading()
+                writer.cancelWriting()
                 return false
             }
-            guard reader?.status == .reading && writer?.status == .writing,
+            guard reader.status == .reading && writer.status == .writing,
                   let sampleBuffer = output.copyNextSampleBuffer() else {
                 input.markAsFinished()
                 return false
