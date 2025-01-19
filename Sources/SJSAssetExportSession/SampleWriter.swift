@@ -208,10 +208,6 @@ actor SampleWriter {
         self.videoInput = videoInput
     }
 
-    func cancel() async {
-        isCancelled = true
-    }
-
     // MARK: - Encoding
 
     private func startEncodingAudioTracks() {
