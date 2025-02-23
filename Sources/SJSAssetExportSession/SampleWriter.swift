@@ -221,7 +221,7 @@ actor SampleWriter {
         }
 
         audioInput.requestMediaDataWhenReady(on: queue) {
-            // NOTE: assumeIsolated crashes on macOS at the moment
+            // NOTE: assumeIsolated crashes on macOS with Swift 6.0, fixed in 6.1
             self.assumeIsolated { _self in
                 _self.writeAllReadySamples()
             }
@@ -230,7 +230,7 @@ actor SampleWriter {
 
     private func startEncodingVideoTracks() {
         videoInput!.requestMediaDataWhenReady(on: queue) {
-            // NOTE: assumeIsolated crashes on macOS at the moment
+            // NOTE: assumeIsolated crashes on macOS with Swift 6.0, fixed in 6.1
             self.assumeIsolated { _self in
                 _self.writeAllReadySamples()
             }
