@@ -229,7 +229,7 @@ actor SampleWriter {
     }
 
     private func startEncodingVideoTracks() {
-        videoInput!.requestMediaDataWhenReady(on: queue) {
+        videoInput?.requestMediaDataWhenReady(on: queue) {
             // NOTE: assumeIsolated crashes on macOS with Swift 6.0, fixed in 6.1
             self.assumeIsolated { _self in
                 _self.writeAllReadySamples()
@@ -243,8 +243,10 @@ actor SampleWriter {
             if !hasMoreAudio { log.debug("Finished encoding audio") }
         }
 
-        let hasMoreVideo = writeReadySamples(output: videoOutput!, input: videoInput!)
-        if !hasMoreVideo { log.debug("Finished encoding video") }
+        if let videoInput, let videoOutput {
+            let hasMoreVideo = writeReadySamples(output: videoOutput, input: videoInput)
+            if !hasMoreVideo { log.debug("Finished encoding video") }
+        }
     }
 
     private func writeReadySamples(output: AVAssetReaderOutput, input: AVAssetWriterInput) -> Bool {
