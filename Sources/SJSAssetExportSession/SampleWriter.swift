@@ -308,7 +308,7 @@ actor SampleWriter {
         let renderWidth = Int(renderSize.width)
         let renderHeight = Int(renderSize.height)
         if renderWidth != settingsWidth || renderHeight != settingsHeight {
-            log.warning("Video composition's render size (\(renderWidth)ｘ\(renderHeight)) will be overriden by video output settings (\(settingsWidth)ｘ\(settingsHeight))")
+            log.warning("Video composition's render size (\(renderWidth)ｘ\(renderHeight)) will be overridden by video output settings (\(settingsWidth)ｘ\(settingsHeight))")
         }
     }
 }
