@@ -101,7 +101,7 @@ final class ExportSessionTests: BaseTests {
         #expect(videoFormat.extensions[.yCbCrMatrix] == .yCbCrMatrix(.itu_R_709_2))
     }
 
-    @Test func test_export_default_timerange() async throws {
+    @Test func test_export_default_time_range() async throws {
         let sourceURL = resourceURL(named: "test-720p-h264-24fps.mov")
         let destinationURL = makeTemporaryURL()
 
@@ -224,17 +224,17 @@ final class ExportSessionTests: BaseTests {
 
     @Test func test_export_throws_with_empty_audio_settings() async throws {
         try await #require(throws: ExportSession.Error.setupFailure(.audioSettingsEmpty)) {
-            let sourceURL = resourceURL(named: "test-720p-h264-24fps.mov")
-            let videoComposition = try await makeVideoComposition(assetURL: sourceURL)
+            let sourceURL = self.resourceURL(named: "test-720p-h264-24fps.mov")
+            let videoComposition = try await self.makeVideoComposition(assetURL: sourceURL)
 
             let subject = ExportSession()
             try await subject.export(
-                asset: makeAsset(url: sourceURL),
+                asset: self.makeAsset(url: sourceURL),
                 audioOutputSettings: [:], // Here it matters because there's an audio track
                 videoOutputSettings: VideoOutputSettings
                     .codec(.h264, size:  videoComposition.renderSize).settingsDictionary,
                 composition: videoComposition,
-                to: makeTemporaryURL().url,
+                to: self.makeTemporaryURL().url,
                 as: .mov
             )
         }
@@ -242,18 +242,18 @@ final class ExportSessionTests: BaseTests {
 
     @Test func test_export_throws_with_invalid_audio_settings() async throws {
         try await #require(throws: ExportSession.Error.setupFailure(.audioSettingsInvalid)) {
-            let sourceURL = resourceURL(named: "test-720p-h264-24fps.mov")
+            let sourceURL = self.resourceURL(named: "test-720p-h264-24fps.mov")
 
             let subject = ExportSession()
             try await subject.export(
-                asset: makeAsset(url: sourceURL),
+                asset: self.makeAsset(url: sourceURL),
                 audioOutputSettings: [
                     AVFormatIDKey: kAudioFormatMPEG4AAC,
                     AVNumberOfChannelsKey: NSNumber(value: -1), // invalid number of channels
                 ],
                 videoOutputSettings: VideoOutputSettings
                     .codec(.h264, size: CGSize(width: 1280, height: 720)).settingsDictionary,
-                to: makeTemporaryURL().url,
+                to: self.makeTemporaryURL().url,
                 as: .mov
             )
         }
@@ -261,12 +261,12 @@ final class ExportSessionTests: BaseTests {
 
     @Test func test_export_throws_with_invalid_video_settings() async throws {
         try await #require(throws: ExportSession.Error.setupFailure(.videoSettingsInvalid)) {
-            let sourceURL = resourceURL(named: "test-720p-h264-24fps.mov")
+            let sourceURL = self.resourceURL(named: "test-720p-h264-24fps.mov")
             let size = CGSize(width: 1280, height: 720)
 
             let subject = ExportSession()
             try await subject.export(
-                asset: makeAsset(url: sourceURL),
+                asset: self.makeAsset(url: sourceURL),
                 audioOutputSettings: AudioOutputSettings.default.settingsDictionary,
                 videoOutputSettings: [
                     // missing codec
@@ -274,7 +274,7 @@ final class ExportSessionTests: BaseTests {
                     AVVideoHeightKey: NSNumber(value: Int(size.height)),
                 ],
                 composition: nil,
-                to: makeTemporaryURL().url,
+                to: self.makeTemporaryURL().url,
                 as: .mov
             )
         }
@@ -282,12 +282,12 @@ final class ExportSessionTests: BaseTests {
 
     @Test func test_export_throws_with_no_video_track() async throws {
         try await #require(throws: ExportSession.Error.setupFailure(.videoTracksEmpty)) {
-            let sourceURL = resourceURL(named: "test-no-video.m4a")
+            let sourceURL = self.resourceURL(named: "test-no-video.m4a")
             let subject = ExportSession()
             try await subject.export(
-                asset: makeAsset(url: sourceURL),
+                asset: self.makeAsset(url: sourceURL),
                 video: .codec(.h264, width: 1280, height: 720),
-                to: makeTemporaryURL().url,
+                to: self.makeTemporaryURL().url,
                 as: .mov
             )
         }
