@@ -1,49 +1,133 @@
 # ``SJSAssetExportSession``
 
-`SJSAssetExportSession` is an alternative to `AVAssetExportSession` that lets you provide custom audio and video settings, without dropping down into the world of `AVAssetReader` and `AVAssetWriter`.
+A Swift-first alternative to AVAssetExportSession with custom audio/video settings and strict concurrency support.
 
-[`AVAssetExportSession`][AV] is fine for some things but it provides basically no way to customize the export settings, besides the couple of options on `AVVideoComposition` like render size and frame rate. This package has similar capabilites to the venerable [`SDAVAssetExportSession`][SDAV] but the API is completely different, the code is written in Swift, and it's ready for the world of strict concurrency.
+## Overview
 
-You shouldn't have to read through [audio settings][] and [video settings][] just to set the bitrate, and setting the frame rate can be tricky, so there's a nicer API that builds these settings dictionaries with some commonly used settings.
+`SJSAssetExportSession` is a modern Swift package that provides an alternative to `AVAssetExportSession` with full control over audio and video export settings. Unlike the built-in `AVAssetExportSession`, this library allows you to specify custom codec settings, bitrates, frame rates, and color properties without having to work directly with `AVAssetReader` and `AVAssetWriter`.
+
+### Key Features
+
+- **Two-tier API Design**: Choose between a simple builder pattern or raw settings dictionaries for maximum flexibility
+- **Swift 6 Strict Concurrency**: Built from the ground up with `Sendable` types and async/await
+- **Real-time Progress Reporting**: Monitor export progress via `AsyncStream<Float>`
+- **Comprehensive Format Support**: H.264, HEVC, AAC, MP3, and more
+- **Advanced Color Management**: Support for both SDR (BT.709) and HDR (BT.2020) workflows
+- **Mix-and-Match Approach**: Bootstrap custom settings from builder patterns for ultimate flexibility
+
+### Why SJSAssetExportSession?
+
+[`AVAssetExportSession`][AV] provides limited customization options, essentially restricting you to the presets it offers. This package gives you the control you need while maintaining a simple, Swift-friendly API.
 
 [AV]: https://developer.apple.com/documentation/avfoundation/avassetexportsession
-[SDAV]: https://github.com/rs/SDAVAssetExportSession
+
+Instead of wrestling with complex [audio settings][] and [video settings][] dictionaries, you can use the builder pattern to construct exactly what you need:
+
 [audio settings]: https://developer.apple.com/documentation/avfoundation/audio_settings
 [video settings]: https://developer.apple.com/documentation/avfoundation/video_settings
-
-The simplest usage is something like this:
 
 ```swift
 let exporter = ExportSession()
 Task {
     for await progress in exporter.progressStream {
-        print("Progress: \(progress)")
+        print("Export progress: \(progress)")
     }
 }
+
 try await exporter.export(
-    asset: AVURLAsset(url: sourceURL, options: [AVURLAssetPreferPreciseDurationAndTimingKey: true]),
-    video: .codec(.h264, width: 1280, height: 720),
-    to: URL.temporaryDirectory.appeding(component: "new-video.mp4"),
+    asset: sourceAsset,
+    audio: .format(.aac).channels(2).sampleRate(48_000),
+    video: .codec(.h264, width: 1920, height: 1080)
+        .fps(30)
+        .bitrate(5_000_000)
+        .color(.sdr),
+    to: destinationURL,
     as: .mp4
+)
+```
+
+## Getting Started
+
+### Basic Export
+
+The simplest way to get started is with a basic video export:
+
+```swift
+let exporter = ExportSession()
+try await exporter.export(
+    asset: AVURLAsset(url: sourceURL),
+    video: .codec(.h264, width: 1280, height: 720),
+    to: destinationURL,
+    as: .mp4
+)
+```
+
+### Monitoring Progress
+
+Track export progress using the built-in progress stream:
+
+```swift
+let exporter = ExportSession()
+Task {
+    for await progress in exporter.progressStream {
+        DispatchQueue.main.async {
+            progressView.progress = progress
+        }
+    }
+}
+try await exporter.export(/* ... */)
+```
+
+### Advanced Configuration
+
+For more control, specify custom audio settings, metadata, and time ranges:
+
+```swift
+try await exporter.export(
+    asset: sourceAsset,
+    optimizeForNetworkUse: true,
+    metadata: [locationMetadata],
+    timeRange: CMTimeRange(start: .zero, duration: .seconds(30)),
+    audio: .format(.mp3).channels(1).sampleRate(22_050),
+    video: .codec(.hevc, width: 3840, height: 2160)
+        .fps(60)
+        .bitrate(15_000_000)
+        .color(.hdr),
+    to: destinationURL,
+    as: .mov
 )
 ```
 
 ## Topics
 
-### Exporting
+### Essentials
 
 - ``ExportSession``
-- ``ExportSession/Error``
-- ``ExportSession/SetupFailureReason``
+- <doc:GettingStarted>
+- <doc:ExportingVideos>
 
-### Audio Output Settings
+### Audio Configuration
 
 - ``AudioOutputSettings``
 - ``AudioOutputSettings/Format``
+- <doc:AudioConfiguration>
 
-### Video Output Settings
+### Video Configuration
 
 - ``VideoOutputSettings``
 - ``VideoOutputSettings/Codec``
 - ``VideoOutputSettings/H264Profile``
 - ``VideoOutputSettings/Color``
+- <doc:VideoConfiguration>
+
+### Error Handling
+
+- ``ExportSession/Error``
+- ``ExportSession/SetupFailureReason``
+- <doc:ErrorHandling>
+
+### Advanced Topics
+
+- <doc:CustomSettings>
+- <doc:ProgressTracking>
+- <doc:PerformanceOptimization>
