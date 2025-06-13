@@ -103,7 +103,7 @@ func exportVideo() async throws {
 - Learn about <doc:AudioConfiguration> to customize audio settings
 - Explore <doc:VideoConfiguration> for advanced video options
 - Check out <doc:ExportingVideos> for more complex scenarios
-- Read about <doc:ErrorHandling> to handle export failures gracefully
+- See <doc:ProgressTracking> for progress monitoring patterns
 
 ## Common Patterns
 

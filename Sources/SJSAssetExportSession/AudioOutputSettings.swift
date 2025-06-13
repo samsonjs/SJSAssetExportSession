@@ -40,14 +40,25 @@ public struct AudioOutputSettings: Hashable, Sendable, Codable {
         .init(format: format.formatID, channels: 2, sampleRate: nil)
     }
 
+    /// Sets the number of output channels.
+    ///
+    /// - Parameter channels: Number of channels (1 for mono, 2 for stereo, etc.).
+    /// - Returns: A new AudioOutputSettings with the specified channel count.
     public func channels(_ channels: Int) -> AudioOutputSettings {
         .init(format: format, channels: channels, sampleRate: sampleRate)
     }
 
+    /// Sets the sample rate in Hz.
+    ///
+    /// - Parameter sampleRate: Sample rate in Hz, or nil to use default for format.
+    /// - Returns: A new AudioOutputSettings with the specified sample rate.
     public func sampleRate(_ sampleRate: Int?) -> AudioOutputSettings {
         .init(format: format, channels: channels, sampleRate: sampleRate)
     }
 
+    /// Converts these settings to an AVFoundation audio settings dictionary.
+    ///
+    /// - Returns: Dictionary suitable for use with AVAssetWriter.
     public var settingsDictionary: [String: any Sendable] {
         if let sampleRate {
             [

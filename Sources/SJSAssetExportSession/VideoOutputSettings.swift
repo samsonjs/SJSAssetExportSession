@@ -102,18 +102,33 @@ public struct VideoOutputSettings: Hashable, Sendable, Codable {
         .codec(codec, size: CGSize(width: width, height: height))
     }
 
+    /// Sets the output frame rate.
+    ///
+    /// - Parameter fps: Target frame rate in frames per second, or nil for default.
+    /// - Returns: A new VideoOutputSettings with the specified frame rate.
     public func fps(_ fps: Int?) -> VideoOutputSettings {
         .init(codec: codec, size: size, fps: fps, bitrate: bitrate, color: color)
     }
 
+    /// Sets the output bitrate.
+    ///
+    /// - Parameter bitrate: Target bitrate in bits per second, or nil for default.
+    /// - Returns: A new VideoOutputSettings with the specified bitrate.
     public func bitrate(_ bitrate: Int?) -> VideoOutputSettings {
         .init(codec: codec, size: size, fps: fps, bitrate: bitrate, color: color)
     }
 
+    /// Sets the color space configuration.
+    ///
+    /// - Parameter color: Color space settings, or nil for default.
+    /// - Returns: A new VideoOutputSettings with the specified color configuration.
     public func color(_ color: Color?) -> VideoOutputSettings {
         .init(codec: codec, size: size, fps: fps, bitrate: bitrate, color: color)
     }
 
+    /// Converts these settings to an AVFoundation video settings dictionary.
+    ///
+    /// - Returns: Dictionary suitable for use with AVAssetWriter.
     public var settingsDictionary: [String: any Sendable] {
         var result: [String: any Sendable] = [
             AVVideoCodecKey: codec.stringValue,

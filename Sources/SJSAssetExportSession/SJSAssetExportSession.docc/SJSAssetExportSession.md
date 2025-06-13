@@ -8,12 +8,11 @@ A Swift-first alternative to AVAssetExportSession with custom audio/video settin
 
 ### Key Features
 
-- **Two-tier API Design**: Choose between a simple builder pattern or raw settings dictionaries for maximum flexibility
-- **Swift 6 Strict Concurrency**: Built from the ground up with `Sendable` types and async/await
+- **Builder Pattern API**: Intuitive, type-safe configuration with method chaining
+- **Swift 6 Strict Concurrency**: Built with `Sendable` types and async/await
 - **Real-time Progress Reporting**: Monitor export progress via `AsyncStream<Float>`
-- **Comprehensive Format Support**: H.264, HEVC, AAC, MP3, and more
-- **Advanced Color Management**: Support for both SDR (BT.709) and HDR (BT.2020) workflows
-- **Mix-and-Match Approach**: Bootstrap custom settings from builder patterns for ultimate flexibility
+- **Format Support**: H.264, HEVC, AAC, MP3 with custom settings
+- **Color Management**: Support for both SDR (BT.709) and HDR (BT.2020) workflows
 
 ### Why SJSAssetExportSession?
 
@@ -124,10 +123,8 @@ try await exporter.export(
 
 - ``ExportSession/Error``
 - ``ExportSession/SetupFailureReason``
-- <doc:ErrorHandling>
 
 ### Advanced Topics
 
-- <doc:CustomSettings>
 - <doc:ProgressTracking>
 - <doc:PerformanceOptimization>

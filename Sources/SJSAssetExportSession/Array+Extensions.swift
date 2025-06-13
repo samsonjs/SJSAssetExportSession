@@ -6,6 +6,10 @@
 //
 
 extension Array {
+    /// Filters the array using an async predicate function.
+    ///
+    /// - Parameter isIncluded: Async predicate to test each element.
+    /// - Returns: Array containing only elements where the predicate returned true.
     func filterAsync(_ isIncluded: (Element) async throws -> Bool) async rethrows -> [Element] {
         var result: [Element] = []
         for element in self {
