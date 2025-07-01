@@ -101,7 +101,26 @@ actor SampleWriter {
             try await CMTimeRange(start: .zero, duration: asset.load(.duration))
         }
 
-        try await setUpAudio(audioTracks: audioTracks)
+        // This used to be a separate method but that doesn't build in Xcode 26.0 RC
+        if !audioTracks.isEmpty {
+            let audioOutput = AVAssetReaderAudioMixOutput(audioTracks: audioTracks, audioSettings: nil)
+            audioOutput.alwaysCopiesSampleData = false
+            audioOutput.audioMix = audioMix
+            guard reader.canAdd(audioOutput) else {
+                throw Error.setupFailure(.cannotAddAudioOutput)
+            }
+            reader.add(audioOutput)
+            self.audioOutput = audioOutput
+
+            let audioInput = AVAssetWriterInput(mediaType: .audio, outputSettings: audioOutputSettings)
+            audioInput.expectsMediaDataInRealTime = false
+            guard writer.canAdd(audioInput) else {
+                throw Error.setupFailure(.cannotAddAudioInput)
+            }
+            writer.add(audioInput)
+            self.audioInput = audioInput
+        }
+
         try await setUpVideo(videoTracks: videoTracks)
     }
 
@@ -166,27 +185,6 @@ actor SampleWriter {
     }
 
     // MARK: - Setup
-
-    private func setUpAudio(audioTracks: [AVAssetTrack]) throws {
-        guard !audioTracks.isEmpty else { return }
-
-        let audioOutput = AVAssetReaderAudioMixOutput(audioTracks: audioTracks, audioSettings: nil)
-        audioOutput.alwaysCopiesSampleData = false
-        audioOutput.audioMix = audioMix
-        guard let reader, reader.canAdd(audioOutput) else {
-            throw Error.setupFailure(.cannotAddAudioOutput)
-        }
-        reader.add(audioOutput)
-        self.audioOutput = audioOutput
-
-        let audioInput = AVAssetWriterInput(mediaType: .audio, outputSettings: audioOutputSettings)
-        audioInput.expectsMediaDataInRealTime = false
-        guard let writer, writer.canAdd(audioInput) else {
-            throw Error.setupFailure(.cannotAddAudioInput)
-        }
-        writer.add(audioInput)
-        self.audioInput = audioInput
-    }
 
     private func setUpVideo(videoTracks: [AVAssetTrack]) throws {
         precondition(!videoTracks.isEmpty, "Video tracks must be provided")
