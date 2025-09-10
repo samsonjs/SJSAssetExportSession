@@ -198,6 +198,6 @@ try await exporter.export(
 
 ## License
 
-Copyright © 2024 [Sami Samhuri](https://samhuri.net) <sami@samhuri.net>. Released under the terms of the [MIT License][MIT].
+Copyright © 2024-2025 [Sami Samhuri](https://samhuri.net) <sami@samhuri.net>. Released under the terms of the [MIT License][MIT].
 
 [MIT]: https://sjs.mit-license.org
