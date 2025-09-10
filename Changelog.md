@@ -4,7 +4,14 @@
 
 - Your change here.
 
-[Unreleased]: https://github.com/samsonjs/SJSAssetExportSession/compare/0.3.9...HEAD
+[Unreleased]: https://github.com/samsonjs/SJSAssetExportSession/compare/0.4.0...HEAD
+
+## [0.4.0] - 2025-09-10
+
+### Fixed
+- Fixed building with Xcode 26 RC
+
+[0.4.0]: https://github.com/samsonjs/SJSAssetExportSession/compare/0.3.9...0.4.0
 
 ## [0.3.9] - 2025-05-25
 
