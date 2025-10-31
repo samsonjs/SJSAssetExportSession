@@ -68,9 +68,22 @@ actor SampleWriter {
         if let timeRange {
             reader.timeRange = timeRange
         }
+        self.reader = reader
+
         let writer = try AVAssetWriter(outputURL: outputURL, fileType: fileType)
         writer.shouldOptimizeForNetworkUse = optimizeForNetworkUse
         writer.metadata = metadata
+        self.writer = writer
+
+        self.audioOutputSettings = audioOutputSettings
+        self.audioMix = audioMix
+        self.videoOutputSettings = videoOutputSettings
+        self.videoComposition = videoComposition
+        self.timeRange = if let timeRange {
+            timeRange
+        } else {
+            try await CMTimeRange(start: .zero, duration: asset.load(.duration))
+        }
 
         // Filter out disabled tracks to avoid problems encoding spatial audio. Ideally this would
         // preserve track groups and make that all configurable.
@@ -79,30 +92,6 @@ actor SampleWriter {
         // Audio is optional so only validate output settings when it's applicable.
         if !audioTracks.isEmpty {
             try Self.validateAudio(outputSettings: audioOutputSettings, writer: writer)
-        }
-        let videoTracks = try await asset.loadTracks(withMediaType: .video)
-            .filterAsync { try await $0.load(.isEnabled) }
-        guard !videoTracks.isEmpty else { throw Error.setupFailure(.videoTracksEmpty) }
-        try Self.validateVideo(outputSettings: videoOutputSettings, writer: writer)
-        Self.warnAboutMismatchedVideoSize(
-            renderSize: videoComposition.renderSize,
-            settings: videoOutputSettings
-        )
-
-        self.audioOutputSettings = audioOutputSettings
-        self.audioMix = audioMix
-        self.videoOutputSettings = videoOutputSettings
-        self.videoComposition = videoComposition
-        self.reader = reader
-        self.writer = writer
-        self.timeRange = if let timeRange {
-            timeRange
-        } else {
-            try await CMTimeRange(start: .zero, duration: asset.load(.duration))
-        }
-
-        // This used to be a separate method but that doesn't build in Xcode 26.0 RC
-        if !audioTracks.isEmpty {
             let audioOutput = AVAssetReaderAudioMixOutput(audioTracks: audioTracks, audioSettings: nil)
             audioOutput.alwaysCopiesSampleData = false
             audioOutput.audioMix = audioMix
@@ -121,7 +110,33 @@ actor SampleWriter {
             self.audioInput = audioInput
         }
 
-        try await setUpVideo(videoTracks: videoTracks)
+        let videoTracks = try await asset.loadTracks(withMediaType: .video)
+            .filterAsync { try await $0.load(.isEnabled) }
+        guard !videoTracks.isEmpty else { throw Error.setupFailure(.videoTracksEmpty) }
+        try Self.validateVideo(outputSettings: videoOutputSettings, writer: writer)
+        Self.warnAboutMismatchedVideoSize(
+            renderSize: videoComposition.renderSize,
+            settings: videoOutputSettings
+        )
+        let videoOutput = AVAssetReaderVideoCompositionOutput(
+            videoTracks: videoTracks,
+            videoSettings: nil
+        )
+        videoOutput.alwaysCopiesSampleData = false
+        videoOutput.videoComposition = videoComposition
+        guard reader.canAdd(videoOutput) else {
+            throw Error.setupFailure(.cannotAddVideoOutput)
+        }
+        reader.add(videoOutput)
+        self.videoOutput = videoOutput
+
+        let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoOutputSettings)
+        videoInput.expectsMediaDataInRealTime = false
+        guard writer.canAdd(videoInput) else {
+            throw Error.setupFailure(.cannotAddVideoInput)
+        }
+        writer.add(videoInput)
+        self.videoInput = videoInput
     }
 
     func writeSamples() async throws {
@@ -182,32 +197,6 @@ actor SampleWriter {
             }
             progressContinuation.finish()
         }
-    }
-
-    // MARK: - Setup
-
-    private func setUpVideo(videoTracks: [AVAssetTrack]) throws {
-        precondition(!videoTracks.isEmpty, "Video tracks must be provided")
-
-        let videoOutput = AVAssetReaderVideoCompositionOutput(
-            videoTracks: videoTracks,
-            videoSettings: nil
-        )
-        videoOutput.alwaysCopiesSampleData = false
-        videoOutput.videoComposition = videoComposition
-        guard let reader, reader.canAdd(videoOutput) else {
-            throw Error.setupFailure(.cannotAddVideoOutput)
-        }
-        reader.add(videoOutput)
-        self.videoOutput = videoOutput
-
-        let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoOutputSettings)
-        videoInput.expectsMediaDataInRealTime = false
-        guard let writer, writer.canAdd(videoInput) else {
-            throw Error.setupFailure(.cannotAddVideoInput)
-        }
-        writer.add(videoInput)
-        self.videoInput = videoInput
     }
 
     // MARK: - Encoding
