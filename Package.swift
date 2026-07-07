@@ -14,7 +14,10 @@ let package = Package(
             targets: ["SJSAssetExportSession"]),
     ],
     targets: [
-        .target(name: "SJSAssetExportSession"),
+        .target(
+            name: "SJSAssetExportSession",
+            exclude: ["SJSAssetExportSession.docc"]
+        ),
         .testTarget(
             name: "SJSAssetExportSessionTests",
             dependencies: ["SJSAssetExportSession"],
