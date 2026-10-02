@@ -2,7 +2,8 @@
 
 ## [Unreleased]
 
-- Your change here.
+### Fixed
+- Fixed audio tracks going silent partway through long exports that mix tracks with different sample rates
 
 [Unreleased]: https://github.com/samsonjs/SJSAssetExportSession/compare/0.4.0...HEAD
 

@@ -92,7 +92,10 @@ actor SampleWriter {
         // Audio is optional so only validate output settings when it's applicable.
         if !audioTracks.isEmpty {
             try Self.validateAudio(outputSettings: audioOutputSettings, writer: writer)
-            let audioOutput = AVAssetReaderAudioMixOutput(audioTracks: audioTracks, audioSettings: nil)
+            let audioOutput = AVAssetReaderAudioMixOutput(
+                audioTracks: audioTracks,
+                audioSettings: Self.audioMixSettings(matching: audioOutputSettings)
+            )
             audioOutput.alwaysCopiesSampleData = false
             audioOutput.audioMix = audioMix
             guard reader.canAdd(audioOutput) else {
@@ -257,6 +260,19 @@ actor SampleWriter {
 
         // Everything was appended successfully, return true indicating there's more to do.
         return true
+    }
+
+    // MARK: Audio mix format
+
+    /// Linear PCM settings for the audio mix output at the writer's sample rate. AVFoundation's
+    /// default behaviour can drop a track partway through a long export, e.g. a 44.1 kHz track
+    /// mixed with a 48 kHz one.
+    private static func audioMixSettings(
+        matching outputSettings: [String: any Sendable]
+    ) -> [String: any Sendable] {
+        var settings: [String: any Sendable] = [AVFormatIDKey: kAudioFormatLinearPCM]
+        settings[AVSampleRateKey] = outputSettings[AVSampleRateKey]
+        return settings
     }
 
     // MARK: Input validation
