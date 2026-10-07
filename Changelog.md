@@ -2,11 +2,17 @@
 
 ## [Unreleased]
 
+- Your change here.
+
+[Unreleased]: https://github.com/samsonjs/SJSAssetExportSession/compare/0.4.1...HEAD
+
+## [0.4.1] - 2026-10-07
+
 ### Fixed
 - Fixed audio tracks going silent partway through long exports that mix tracks with different sample rates
 - Fixed exports failing with -12780 on iOS when the source has more audio channels than the output asks for (e.g. a 5.1 QuickTime screen recording exported as stereo AAC). The reader now downmixes to the output channel count instead of leaving it to the writer, which only works on macOS.
 
-[Unreleased]: https://github.com/samsonjs/SJSAssetExportSession/compare/0.4.0...HEAD
+[0.4.1]: https://github.com/samsonjs/SJSAssetExportSession/compare/0.4.0...0.4.1
 
 ## [0.4.0] - 2025-09-10
 
