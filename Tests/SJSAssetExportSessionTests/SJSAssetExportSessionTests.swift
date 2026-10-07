@@ -356,6 +356,25 @@ final class ExportSessionTests: BaseTests {
         #expect(commonMetadataValue == "+48.50176+123.34368/")
     }
 
+    @Test func test_downmixes_surround_audio_to_stereo() async throws {
+        let sourceURL = resourceURL(named: "test-5.1-audio.mp4")
+        let destinationURL = makeTemporaryURL()
+
+        let subject = ExportSession()
+        try await subject.export(
+            asset: makeAsset(url: sourceURL),
+            video: .codec(.h264, size: CGSize(width: 64, height: 64)),
+            to: destinationURL.url,
+            as: .mp4
+        )
+
+        let exportedAsset = AVURLAsset(url: destinationURL.url)
+        let audioTrack = try #require(await exportedAsset.loadTracks(withMediaType: .audio).first)
+        let audioFormat = try #require(await audioTrack.load(.formatDescriptions).first)
+        #expect(audioFormat.mediaSubType == .mpeg4AAC)
+        #expect(audioFormat.audioStreamBasicDescription?.mChannelsPerFrame == 2)
+    }
+
     @Test func test_works_with_spatial_audio_track() async throws {
         let sourceURL = resourceURL(named: "test-spatial-audio.mov")
         let destinationURL = makeTemporaryURL()

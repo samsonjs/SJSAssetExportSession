@@ -264,14 +264,17 @@ actor SampleWriter {
 
     // MARK: Audio mix format
 
-    /// Linear PCM settings for the audio mix output at the writer's sample rate. AVFoundation's
-    /// default behaviour can drop a track partway through a long export, e.g. a 44.1 kHz track
-    /// mixed with a 48 kHz one.
+    /// Linear PCM settings for the audio mix output at the writer's sample rate and channel count.
+    /// AVFoundation's default behaviour can drop a track partway through a long export, e.g. a
+    /// 44.1 kHz track mixed with a 48 kHz one. The writer input also can't change the channel
+    /// count on iOS: appending 5.1 PCM to a stereo AAC input fails with -12780 (macOS downmixes
+    /// silently), so the reader does the downmix instead.
     private static func audioMixSettings(
         matching outputSettings: [String: any Sendable]
     ) -> [String: any Sendable] {
         var settings: [String: any Sendable] = [AVFormatIDKey: kAudioFormatLinearPCM]
         settings[AVSampleRateKey] = outputSettings[AVSampleRateKey]
+        settings[AVNumberOfChannelsKey] = outputSettings[AVNumberOfChannelsKey]
         return settings
     }
 

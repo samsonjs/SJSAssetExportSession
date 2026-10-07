@@ -23,6 +23,7 @@ let package = Package(
             dependencies: ["SJSAssetExportSession"],
             resources: [
                 .process("Resources/test-4k-hdr-hevc-30fps.mov"),
+                .process("Resources/test-5.1-audio.mp4"),
                 .process("Resources/test-720p-h264-24fps.mov"),
                 .process("Resources/test-no-audio.mp4"),
                 .process("Resources/test-no-video.m4a"),
