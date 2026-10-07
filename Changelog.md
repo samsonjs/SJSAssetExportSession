@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- `drawFrame:` on both `export` methods takes a `FrameArtist` closure that draws into each video frame in place before it's encoded, for overlays and watermarks drawn with Metal or Core Image. Each `VideoFrame` carries the composition's colour primaries, transfer function and YCbCr matrix.
+
 ### Changed
 - Video is now read from the composition as 10-bit frames when its transfer function is HLG or PQ and 8-bit otherwise, IOSurface-backed and Metal-compatible, instead of in a format that varied by platform and source.
 

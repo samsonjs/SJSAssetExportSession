@@ -34,11 +34,13 @@ public final class ExportSession: Sendable {
 
        - video: Video settings using ``VideoOutputSettings``.
 
+       - drawFrame: An optional ``FrameArtist`` that draws into each video frame, in place, before it's encoded. See ``FrameArtist`` for when it's called and what it can rely on.
+
        - outputURL: The file `URL` where the exported video will be written.
 
        - fileType: The type of of video file to export. This will typically be one of `AVFileType.mp4`, `AVFileType.m4v`, or `AVFileType.mov`.
 
-     - Throws: One of the cases in the ``ExportSession/Error`` enum when the export fails. See ``ExportSession/Error`` for possible failures.
+     - Throws: One of the cases in the ``ExportSession/Error`` enum when the export fails, or the error thrown by `drawFrame`. See ``ExportSession/Error`` for possible failures.
      */
     public func export(
         asset: sending AVAsset,
@@ -48,6 +50,7 @@ public final class ExportSession: Sendable {
         audio: sending AudioOutputSettings = .default,
         mix: sending AVAudioMix? = nil,
         video: sending VideoOutputSettings,
+        drawFrame: sending FrameArtist? = nil,
         to outputURL: URL,
         as fileType: AVFileType
     ) async throws {
@@ -63,6 +66,7 @@ public final class ExportSession: Sendable {
             timeRange: timeRange,
             optimizeForNetworkUse: optimizeForNetworkUse,
             metadata: metadata,
+            drawFrame: drawFrame,
             outputURL: outputURL,
             fileType: fileType
         )
@@ -99,11 +103,13 @@ public final class ExportSession: Sendable {
 
        - composition: An optional composition that can be used to manipulate the video in some way. This can scale the video, apply filters, or ramp audio volume, amongst other edits.
 
+       - drawFrame: An optional ``FrameArtist`` that draws into each video frame, in place, before it's encoded. See ``FrameArtist`` for when it's called and what it can rely on.
+
        - outputURL: The file URL where the exported video will be written.
 
        - fileType: The type of of video file to export. This will typically be one of `AVFileType.mp4`, `AVFileType.m4v`, or `AVFileType.mov`.
 
-     - Throws: One of the cases in the ``ExportSession/Error`` enum when the export fails. See ``ExportSession/Error`` for possible failures.
+     - Throws: One of the cases in the ``ExportSession/Error`` enum when the export fails, or the error thrown by `drawFrame`. See ``ExportSession/Error`` for possible failures.
      */
     public func export(
         asset: sending AVAsset,
@@ -114,6 +120,7 @@ public final class ExportSession: Sendable {
         mix: sending AVAudioMix? = nil,
         videoOutputSettings: [String: any Sendable],
         composition: sending AVVideoComposition? = nil,
+        drawFrame: sending FrameArtist? = nil,
         to outputURL: URL,
         as fileType: AVFileType
     ) async throws {
@@ -145,6 +152,7 @@ public final class ExportSession: Sendable {
             timeRange: timeRange,
             optimizeForNetworkUse: optimizeForNetworkUse,
             metadata: metadata,
+            drawFrame: drawFrame,
             outputURL: outputURL,
             fileType: fileType
         )

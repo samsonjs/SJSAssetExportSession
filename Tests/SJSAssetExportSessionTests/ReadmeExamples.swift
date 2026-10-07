@@ -6,6 +6,7 @@
 //
 
 import AVFoundation
+import CoreImage
 import SJSAssetExportSession
 
 private func readmeNiceExample() async throws {
@@ -139,4 +140,48 @@ private func readmeMixAndMatchExample() async throws {
         to: destinationURL,
         as: .mp4
     )
+}
+
+private func readmeDrawFrameExample() async throws {
+    let sourceURL = URL.documentsDirectory.appending(component: "some-video.mov")
+    let sourceAsset = AVURLAsset(url: sourceURL, options: [
+        AVURLAssetPreferPreciseDurationAndTimingKey: true,
+    ])
+    let destinationURL = URL.temporaryDirectory.appending(component: "shiny-new-video.mp4")
+    let watermark = CIImage(contentsOf: URL.documentsDirectory.appending(component: "watermark.png"))!
+    let context = CIContext()
+    let exporter = ExportSession()
+    try await exporter.export(
+        asset: sourceAsset,
+        video: .codec(.h264, width: 1280, height: 720),
+        drawFrame: { frame in
+            let destination = CIRenderDestination(pixelBuffer: frame.pixelBuffer)
+            destination.blendKernel = .sourceOver
+            try context.startTask(toRender: watermark, to: destination).waitUntilCompleted()
+        },
+        to: destinationURL,
+        as: .mp4
+    )
+}
+
+/// What `FrameArtist`'s docs suggest for callers on the main actor.
+@MainActor
+private func mainActorDrawFrameExample(sourceURL: URL, destinationURL: URL) async throws {
+    try await ExportSession().export(
+        asset: AVURLAsset(url: sourceURL),
+        video: .codec(.h264, width: 1280, height: 720),
+        drawFrame: makeWatermarkArtist(),
+        to: destinationURL,
+        as: .mp4
+    )
+}
+
+nonisolated private func makeWatermarkArtist() -> sending FrameArtist {
+    let context = CIContext()
+    let watermark = CIImage(color: .white).cropped(to: CGRect(x: 0, y: 0, width: 16, height: 16))
+    return { frame in
+        let destination = CIRenderDestination(pixelBuffer: frame.pixelBuffer)
+        destination.blendKernel = .sourceOver
+        try context.startTask(toRender: watermark, to: destination).waitUntilCompleted()
+    }
 }

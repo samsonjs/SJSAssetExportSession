@@ -38,6 +38,8 @@ actor SampleWriter {
     private let videoOutputSettings: [String: any Sendable]
     private let videoComposition: AVVideoComposition?
     private let timeRange: CMTimeRange
+    private let drawFrame: FrameArtist?
+    private let frameColour: FrameColour
 
     // MARK: Internal state
 
@@ -47,6 +49,7 @@ actor SampleWriter {
     private var audioInput: AVAssetWriterInput?
     private var videoOutput: AVAssetReaderVideoCompositionOutput?
     private var videoInput: AVAssetWriterInput?
+    private var drawFrameError: (any Swift.Error)?
 
     nonisolated init(
         asset: sending AVAsset,
@@ -57,6 +60,7 @@ actor SampleWriter {
         timeRange: CMTimeRange? = nil,
         optimizeForNetworkUse: Bool = false,
         metadata: [AVMetadataItem] = [],
+        drawFrame: sending FrameArtist? = nil,
         outputURL: URL,
         fileType: AVFileType
     ) async throws {
@@ -79,6 +83,8 @@ actor SampleWriter {
         self.audioMix = audioMix
         self.videoOutputSettings = videoOutputSettings
         self.videoComposition = videoComposition
+        self.drawFrame = drawFrame
+        self.frameColour = FrameColour(of: videoComposition)
         self.timeRange = if let timeRange {
             timeRange
         } else {
@@ -176,6 +182,10 @@ actor SampleWriter {
             try await Task.sleep(for: .milliseconds(10))
         }
 
+        if let drawFrameError {
+            writer.cancelWriting()
+            throw drawFrameError
+        }
         guard writer.status != .failed else {
             reader.cancelReading()
             throw Error.writeFailure(writer.error)
@@ -235,31 +245,62 @@ actor SampleWriter {
 
     private func writeReadySamples(output: AVAssetReaderOutput, input: AVAssetWriterInput) -> Bool {
         while input.isReadyForMoreMediaData {
-            guard reader?.status == .reading && writer?.status == .writing,
-                  let sampleBuffer = output.copyNextSampleBuffer() else {
-                input.markAsFinished()
-                return false
+            // A pool per sample: this loop can run for many frames before returning to the
+            // queue, and whatever the artist autoreleases would otherwise pile up until then.
+            let hasMore = autoreleasepool {
+                writeNextSample(output: output, input: input)
             }
-
-            // Only yield progress values for video. Audio is insignificant in comparison.
-            if output == videoOutput {
-                let endTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
-                let samplePresentationTime = endTime - timeRange.start
-                let progress = Float(samplePresentationTime.seconds / timeRange.duration.seconds)
-                progressContinuation.yield(progress)
-            }
-
-            guard input.append(sampleBuffer) else {
-                log.error("""
-                    Failed to append sample buffer \(String(describing: sampleBuffer)) to input
-                    \(input.debugDescription)
-                """)
-                return false
-            }
+            guard hasMore else { return false }
         }
 
         // Everything was appended successfully, return true indicating there's more to do.
         return true
+    }
+
+    /// Appends one sample, returning false when there are no more to append.
+    private func writeNextSample(output: AVAssetReaderOutput, input: AVAssetWriterInput) -> Bool {
+        guard reader?.status == .reading && writer?.status == .writing,
+              let sampleBuffer = output.copyNextSampleBuffer() else {
+            input.markAsFinished()
+            return false
+        }
+
+        // Only yield progress values for video. Audio is insignificant in comparison.
+        if output == videoOutput {
+            let endTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+            let samplePresentationTime = endTime - timeRange.start
+            let progress = Float(samplePresentationTime.seconds / timeRange.duration.seconds)
+            progressContinuation.yield(progress)
+
+            do {
+                try draw(into: sampleBuffer)
+            } catch {
+                log.error("drawFrame failed: \(error)")
+                drawFrameError = error
+                input.markAsFinished()
+                reader?.cancelReading()
+                return false
+            }
+        }
+
+        guard input.append(sampleBuffer) else {
+            log.error("""
+                Failed to append sample buffer \(String(describing: sampleBuffer)) to input
+                \(input.debugDescription)
+            """)
+            return false
+        }
+        return true
+    }
+
+    private func draw(into sampleBuffer: CMSampleBuffer) throws {
+        guard let drawFrame, let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+
+        try drawFrame(VideoFrame(
+            pixelBuffer: pixelBuffer,
+            presentationTime: CMSampleBufferGetPresentationTimeStamp(sampleBuffer),
+            colour: frameColour
+        ))
     }
 
     // MARK: Audio mix format

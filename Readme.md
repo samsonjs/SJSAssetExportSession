@@ -196,6 +196,34 @@ try await exporter.export(
 )
 ```
 
+### Drawing Into Frames
+
+Pass a `drawFrame` closure to draw into each video frame before it's encoded, for things like watermarks and overlays. It's handed a `VideoFrame` with a writable pixel buffer, the frame's presentation time, and the composition's colour properties. It works with both `export` methods.
+
+```swift
+let sourceURL = URL.documentsDirectory.appending(component: "some-video.mov")
+let sourceAsset = AVURLAsset(url: sourceURL, options: [
+    AVURLAssetPreferPreciseDurationAndTimingKey: true,
+])
+let destinationURL = URL.temporaryDirectory.appending(component: "shiny-new-video.mp4")
+let watermark = CIImage(contentsOf: URL.documentsDirectory.appending(component: "watermark.png"))!
+let context = CIContext()
+let exporter = ExportSession()
+try await exporter.export(
+    asset: sourceAsset,
+    video: .codec(.h264, width: 1280, height: 720),
+    drawFrame: { frame in
+        let destination = CIRenderDestination(pixelBuffer: frame.pixelBuffer)
+        destination.blendKernel = .sourceOver
+        try context.startTask(toRender: watermark, to: destination).waitUntilCompleted()
+    },
+    to: destinationURL,
+    as: .mp4
+)
+```
+
+The pixel buffer is bi-planar YCbCr: 10-bit for HLG and PQ compositions and 8-bit otherwise, IOSurface-backed and Metal-compatible. `drawFrame` is called once per frame, one call at a time, and the frame is encoded as soon as it returns, so finish any GPU work first. Drawing a full frame with Core Image is slow at 4K, so for small overlays it's worth drawing just those pixels, for example with Metal. An error thrown from `drawFrame` stops the export and is rethrown from `export`.
+
 ## License
 
 Copyright © 2024-2025 [Sami Samhuri](https://samhuri.net) <sami@samhuri.net>. Released under the terms of the [MIT License][MIT].

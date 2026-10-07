@@ -36,6 +36,11 @@ try await exporter.export(
 - ``ExportSession/Error``
 - ``ExportSession/SetupFailureReason``
 
+### Drawing Into Frames
+
+- ``FrameArtist``
+- ``VideoFrame``
+
 ### Audio Output Settings
 
 - ``AudioOutputSettings``
