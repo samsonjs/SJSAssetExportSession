@@ -2,7 +2,8 @@
 
 ## [Unreleased]
 
-- Your change here.
+### Fixed
+- Fixed HEVC exports with `.color(.hdr)` coming out 8-bit on iOS. HDR HEVC now asks for the Main 10 profile and SDR HEVC for Main, so the bit depth no longer depends on the platform's encoder.
 
 [Unreleased]: https://github.com/samsonjs/SJSAssetExportSession/compare/0.4.1...HEAD
 
