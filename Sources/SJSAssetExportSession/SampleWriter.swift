@@ -123,7 +123,7 @@ actor SampleWriter {
         )
         let videoOutput = AVAssetReaderVideoCompositionOutput(
             videoTracks: videoTracks,
-            videoSettings: nil
+            videoSettings: Self.readerVideoSettings(for: videoComposition)
         )
         videoOutput.alwaysCopiesSampleData = false
         videoOutput.videoComposition = videoComposition
@@ -278,6 +278,27 @@ actor SampleWriter {
         return settings
     }
 
+    // MARK: Video composition format
+
+    /// 10-bit frames for HLG and PQ compositions and 8-bit otherwise, both video range. With no
+    /// settings the format varies: the iOS simulator hands over 8-bit frames that Metal can't
+    /// wrap for an HLG composition, and an iPhone hands over 10-bit frames for an SDR
+    /// composition of a 10-bit source.
+    static func readerVideoSettings(
+        for videoComposition: AVVideoComposition
+    ) -> [String: any Sendable] {
+        let pixelFormat = if videoComposition.isHDR {
+            kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange
+        } else {
+            kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
+        }
+        return [
+            kCVPixelBufferPixelFormatTypeKey as String: NSNumber(value: pixelFormat),
+            kCVPixelBufferIOSurfacePropertiesKey as String: [String: any Sendable](),
+            kCVPixelBufferMetalCompatibilityKey as String: true,
+        ]
+    }
+
     // MARK: Input validation
 
     private static func validateAudio(
@@ -311,6 +332,15 @@ actor SampleWriter {
         let renderHeight = Int(renderSize.height)
         if renderWidth != settingsWidth || renderHeight != settingsHeight {
             log.warning("Video composition's render size (\(renderWidth)ｘ\(renderHeight)) will be overridden by video output settings (\(settingsWidth)ｘ\(settingsHeight))")
+        }
+    }
+}
+
+extension AVVideoComposition {
+    var isHDR: Bool {
+        switch colorTransferFunction {
+        case AVVideoTransferFunction_ITU_R_2100_HLG, AVVideoTransferFunction_SMPTE_ST_2084_PQ: true
+        default: false
         }
     }
 }

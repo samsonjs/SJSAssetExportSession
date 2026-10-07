@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Changed
+- Video is now read from the composition as 10-bit frames when its transfer function is HLG or PQ and 8-bit otherwise, IOSurface-backed and Metal-compatible, instead of in a format that varied by platform and source.
+
 ### Fixed
 - Fixed HEVC exports with `.color(.hdr)` coming out 8-bit on iOS. HDR HEVC now asks for the Main 10 profile and SDR HEVC for Main, so the bit depth no longer depends on the platform's encoder.
 
