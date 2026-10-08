@@ -196,6 +196,21 @@ try await exporter.export(
 )
 ```
 
+### Frame Rate
+
+Exports keep the source's frame timing unless you ask for a rate, so each source frame is written as it comes. Ask for one with `fps(_:)` and every frame is written at exactly that rate: a sparse source like a 2 fps screen recording has frames repeated to fill it, a denser one has frames dropped, and the last frame fills to the end.
+
+```swift
+try await exporter.export(
+    asset: sourceAsset,
+    video: .codec(.h264, width: 1280, height: 720).fps(30),
+    to: destinationURL,
+    as: .mp4
+)
+```
+
+With your own composition, the same rule follows AVFoundation's: when `sourceTrackIDForFrameTiming` is `kCMPersistentTrackID_Invalid`, frames are written at the composition's `frameDuration`. A composition from `AVMutableVideoComposition.videoComposition(withPropertiesOf:)` times its frames from the source track, so it keeps the source's timing until you set those two properties. A new `AVMutableVideoComposition()` starts out with `kCMPersistentTrackID_Invalid`, so its `frameDuration` sets the rate.
+
 ### Drawing Into Frames
 
 Pass a `drawFrame` closure to draw into each video frame before it's encoded, for things like watermarks and overlays. It's handed a `VideoFrame` with a writable pixel buffer, the frame's presentation time, and the composition's colour properties. It works with both `export` methods.
