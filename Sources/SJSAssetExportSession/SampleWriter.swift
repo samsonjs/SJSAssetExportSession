@@ -195,6 +195,10 @@ actor SampleWriter {
             try await Task.sleep(for: .milliseconds(10))
         }
 
+        // The inputs can finish before the sleep above notices a cancellation, so check again
+        // rather than finishing a cancelled export.
+        try Task.checkCancellation()
+
         if let videoFrameError {
             writer.cancelWriting()
             throw videoFrameError
