@@ -2,10 +2,17 @@
 
 ## [Unreleased]
 
+### Added/Changed/Fixed
+- Your change here.
+
+[Unreleased]: https://github.com/samsonjs/SJSAssetExportSession/compare/0.5.1...HEAD
+
+## [0.5.1] - 2026-10-07
+
 ### Fixed
 - Fixed a cancelled export finishing successfully when the task is cancelled just as the last samples are written. It now throws `CancellationError`.
 
-[Unreleased]: https://github.com/samsonjs/SJSAssetExportSession/compare/0.5.0...HEAD
+[0.5.1]: https://github.com/samsonjs/SJSAssetExportSession/compare/0.5.0...0.5.1
 
 ## [0.5.0] - 2026-10-07
 
