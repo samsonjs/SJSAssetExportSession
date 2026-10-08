@@ -52,6 +52,32 @@ final class DrawFrameTests: BaseTests {
         #expect(exported.colour(at: CGPoint(x: 200, y: 100)) == .blue)
     }
 
+    /// The artist draws into the frames the composition hands over, which aren't copied first.
+    /// If one were a buffer the decoder still predicts later frames from, what was drawn
+    /// into it would turn up again in later frames.
+    @Test func test_drawing_into_frames_leaves_no_trail() async throws {
+        let video = try await TestVideo.make(fps: 30, frameCount: 15)
+        let destinationURL = makeTemporaryURL()
+
+        let subject = ExportSession()
+        try await subject.export(
+            asset: makeAsset(url: video.url.url),
+            video: .codec(.h264, size: TestVideo.size),
+            drawFrame: { frame in
+                // A square sliding right 100 points a second.
+                let x = 100 * frame.presentationTime.seconds
+                fillWhite(CGRect(x: x, y: 160, width: 20, height: 20), in: frame.pixelBuffer)
+            },
+            to: destinationURL.url,
+            as: .mp4
+        )
+
+        // At 0.4 s the square spans x = 40 to 60, and where it started is blue again.
+        let later = try await DecodedFrame.at(CMTime(value: 12, timescale: 30), in: destinationURL.url)
+        #expect(later.colour(at: CGPoint(x: 10, y: 170)) == .blue)
+        #expect(later.colour(at: CGPoint(x: 50, y: 170)) == .white)
+    }
+
     @Test func test_draw_frame_errors_fail_the_export() async throws {
         let video = try await TestVideo.make()
         let destinationURL = makeTemporaryURL()
