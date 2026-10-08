@@ -47,6 +47,10 @@ actor SampleWriter {
     private var audioInput: AVAssetWriterInput?
     private var videoOutput: AVAssetReaderVideoCompositionOutput?
     private var videoInput: AVAssetWriterInput?
+    private var videoFrames: VideoFrameSource?
+    private var videoFrameError: (any Swift.Error)?
+    private var isAudioFinished = true
+    private var isVideoFinished = false
 
     nonisolated init(
         asset: sending AVAsset,
@@ -57,6 +61,7 @@ actor SampleWriter {
         timeRange: CMTimeRange? = nil,
         optimizeForNetworkUse: Bool = false,
         metadata: [AVMetadataItem] = [],
+        drawFrame: sending FrameArtist? = nil,
         outputURL: URL,
         fileType: AVFileType
     ) async throws {
@@ -79,11 +84,12 @@ actor SampleWriter {
         self.audioMix = audioMix
         self.videoOutputSettings = videoOutputSettings
         self.videoComposition = videoComposition
-        self.timeRange = if let timeRange {
+        let timeRange = if let timeRange {
             timeRange
         } else {
             try await CMTimeRange(start: .zero, duration: asset.load(.duration))
         }
+        self.timeRange = timeRange
 
         // Filter out disabled tracks to avoid problems encoding spatial audio. Ideally this would
         // preserve track groups and make that all configurable.
@@ -111,6 +117,7 @@ actor SampleWriter {
             }
             writer.add(audioInput)
             self.audioInput = audioInput
+            isAudioFinished = false
         }
 
         let videoTracks = try await asset.loadTracks(withMediaType: .video)
@@ -123,7 +130,7 @@ actor SampleWriter {
         )
         let videoOutput = AVAssetReaderVideoCompositionOutput(
             videoTracks: videoTracks,
-            videoSettings: nil
+            videoSettings: Self.readerVideoSettings(for: videoComposition)
         )
         videoOutput.alwaysCopiesSampleData = false
         videoOutput.videoComposition = videoComposition
@@ -132,6 +139,12 @@ actor SampleWriter {
         }
         reader.add(videoOutput)
         self.videoOutput = videoOutput
+        videoFrames = VideoFrameSource(
+            output: videoOutput,
+            videoComposition: videoComposition,
+            timeRange: timeRange,
+            drawFrame: drawFrame
+        )
 
         let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoOutputSettings)
         videoInput.expectsMediaDataInRealTime = false
@@ -159,6 +172,7 @@ actor SampleWriter {
             audioOutput = nil
             videoInput = nil
             videoOutput = nil
+            videoFrames = nil
         }
 
         progressContinuation.yield(0.0)
@@ -172,10 +186,19 @@ actor SampleWriter {
         startEncodingAudioTracks()
         startEncodingVideoTracks()
 
-        while reader.status == .reading, writer.status == .writing {
+        // The reader completes once it's handed over its last frame, which can still have
+        // output frames left to fill, so this waits for the inputs instead.
+        while !(isAudioFinished && isVideoFinished),
+              reader.status == .reading || reader.status == .completed,
+              writer.status == .writing
+        {
             try await Task.sleep(for: .milliseconds(10))
         }
 
+        if let videoFrameError {
+            writer.cancelWriting()
+            throw videoFrameError
+        }
         guard writer.status != .failed else {
             reader.cancelReading()
             throw Error.writeFailure(writer.error)
@@ -222,43 +245,75 @@ actor SampleWriter {
     }
 
     private func writeAllReadySamples() {
-        if let audioInput, let audioOutput {
-            let hasMoreAudio = writeReadySamples(output: audioOutput, input: audioInput)
-            if !hasMoreAudio { log.debug("Finished encoding audio") }
+        if let audioInput, let audioOutput, !isAudioFinished {
+            isAudioFinished = !writeReadySamples(to: audioInput) {
+                audioOutput.copyNextSampleBuffer()
+            }
+            if isAudioFinished { log.debug("Finished encoding audio") }
         }
 
-        if let videoInput, let videoOutput {
-            let hasMoreVideo = writeReadySamples(output: videoOutput, input: videoInput)
-            if !hasMoreVideo { log.debug("Finished encoding video") }
+        if let videoInput, let videoFrames, !isVideoFinished {
+            isVideoFinished = !writeReadySamples(to: videoInput) {
+                do {
+                    return try videoFrames.next()
+                } catch {
+                    log.error("Failed to make a video frame: \(error)")
+                    videoFrameError = error
+                    reader?.cancelReading()
+                    return nil
+                }
+            }
+            if isVideoFinished { log.debug("Finished encoding video") }
         }
     }
 
-    private func writeReadySamples(output: AVAssetReaderOutput, input: AVAssetWriterInput) -> Bool {
+    /// Appends samples until the input is full. False once there are no more to append.
+    private func writeReadySamples(
+        to input: AVAssetWriterInput,
+        from nextSample: () -> CMSampleBuffer?
+    ) -> Bool {
         while input.isReadyForMoreMediaData {
-            guard reader?.status == .reading && writer?.status == .writing,
-                  let sampleBuffer = output.copyNextSampleBuffer() else {
-                input.markAsFinished()
-                return false
+            // A pool per sample: this loop can run for many frames before returning to the
+            // queue, and whatever the artist autoreleases would otherwise pile up until then.
+            let hasMore = autoreleasepool {
+                writeNextSample(to: input, from: nextSample)
             }
-
-            // Only yield progress values for video. Audio is insignificant in comparison.
-            if output == videoOutput {
-                let endTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
-                let samplePresentationTime = endTime - timeRange.start
-                let progress = Float(samplePresentationTime.seconds / timeRange.duration.seconds)
-                progressContinuation.yield(progress)
-            }
-
-            guard input.append(sampleBuffer) else {
-                log.error("""
-                    Failed to append sample buffer \(String(describing: sampleBuffer)) to input
-                    \(input.debugDescription)
-                """)
-                return false
-            }
+            guard hasMore else { return false }
         }
 
         // Everything was appended successfully, return true indicating there's more to do.
+        return true
+    }
+
+    /// Appends one sample, returning false when there are no more to append.
+    private func writeNextSample(
+        to input: AVAssetWriterInput,
+        from nextSample: () -> CMSampleBuffer?
+    ) -> Bool {
+        // The reader completes once it's handed over its last frame, and the video frames can
+        // still have output frames to fill after that.
+        guard reader?.status == .reading || reader?.status == .completed,
+              writer?.status == .writing,
+              let sampleBuffer = nextSample() else {
+            input.markAsFinished()
+            return false
+        }
+
+        // Only yield progress values for video. Audio is insignificant in comparison.
+        if input == videoInput {
+            let endTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+            let samplePresentationTime = endTime - timeRange.start
+            let progress = Float(samplePresentationTime.seconds / timeRange.duration.seconds)
+            progressContinuation.yield(progress)
+        }
+
+        guard input.append(sampleBuffer) else {
+            log.error("""
+                Failed to append sample buffer \(String(describing: sampleBuffer)) to input
+                \(input.debugDescription)
+            """)
+            return false
+        }
         return true
     }
 
@@ -276,6 +331,27 @@ actor SampleWriter {
         settings[AVSampleRateKey] = outputSettings[AVSampleRateKey]
         settings[AVNumberOfChannelsKey] = outputSettings[AVNumberOfChannelsKey]
         return settings
+    }
+
+    // MARK: Video composition format
+
+    /// 10-bit frames for HLG and PQ compositions and 8-bit otherwise, both video range. With no
+    /// settings the format varies: the iOS simulator hands over 8-bit frames that Metal can't
+    /// wrap for an HLG composition, and an iPhone hands over 10-bit frames for an SDR
+    /// composition of a 10-bit source.
+    static func readerVideoSettings(
+        for videoComposition: AVVideoComposition
+    ) -> [String: any Sendable] {
+        let pixelFormat = if videoComposition.isHDR {
+            kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange
+        } else {
+            kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
+        }
+        return [
+            kCVPixelBufferPixelFormatTypeKey as String: NSNumber(value: pixelFormat),
+            kCVPixelBufferIOSurfacePropertiesKey as String: [String: any Sendable](),
+            kCVPixelBufferMetalCompatibilityKey as String: true,
+        ]
     }
 
     // MARK: Input validation
@@ -311,6 +387,15 @@ actor SampleWriter {
         let renderHeight = Int(renderSize.height)
         if renderWidth != settingsWidth || renderHeight != settingsHeight {
             log.warning("Video composition's render size (\(renderWidth)ｘ\(renderHeight)) will be overridden by video output settings (\(settingsWidth)ｘ\(settingsHeight))")
+        }
+    }
+}
+
+extension AVVideoComposition {
+    var isHDR: Bool {
+        switch colorTransferFunction {
+        case AVVideoTransferFunction_ITU_R_2100_HLG, AVVideoTransferFunction_SMPTE_ST_2084_PQ: true
+        default: false
         }
     }
 }

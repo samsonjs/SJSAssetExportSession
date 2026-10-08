@@ -6,6 +6,7 @@
 //
 
 import AVFoundation
+import VideoToolbox
 
 /// A convenient API for constructing video settings dictionaries.
 ///
@@ -55,10 +56,15 @@ public struct VideoOutputSettings: Hashable, Sendable, Codable {
             }
         }
 
-        var profileLevel: String? {
-            switch self {
-            case let .h264(profile): profile.level
-            case .hevc: nil
+        /// Without a profile, HEVC's bit depth depends on the platform: the iOS encoder writes
+        /// 8 bits even from 10-bit frames with HDR colour properties, and the macOS encoder
+        /// writes 10 bits from 10-bit frames even with SDR ones.
+        func profileLevel(color: Color?) -> String? {
+            switch (self, color) {
+            case let (.h264(profile), _): profile.level
+            case (.hevc, .hdr): kVTProfileLevel_HEVC_Main10_AutoLevel as String
+            case (.hevc, .sdr): kVTProfileLevel_HEVC_Main_AutoLevel as String
+            case (.hevc, nil): nil
             }
         }
     }
@@ -121,7 +127,7 @@ public struct VideoOutputSettings: Hashable, Sendable, Codable {
             AVVideoHeightKey: NSNumber(value: Int(size.height)),
         ]
         var compressionDict: [String: any Sendable] = [:]
-        if let profileLevel = codec.profileLevel {
+        if let profileLevel = codec.profileLevel(color: color) {
             compressionDict[AVVideoProfileLevelKey] = profileLevel
         }
         if let bitrate {
