@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Added/Changed/Fixed
+- Your change here.
+
+[Unreleased]: https://github.com/samsonjs/SJSAssetExportSession/compare/0.5.0...HEAD
+
+## [0.5.0] - 2026-10-07
+
 ### Added
 - `drawFrame:` on both `export` methods takes a `FrameArtist` closure that draws into each video frame in place before it's encoded, for overlays and watermarks drawn with Metal or Core Image. Each `VideoFrame` carries the composition's colour primaries, transfer function and YCbCr matrix.
 
@@ -12,7 +19,7 @@
 ### Fixed
 - Fixed HEVC exports with `.color(.hdr)` coming out 8-bit on iOS. HDR HEVC now asks for the Main 10 profile and SDR HEVC for Main, so the bit depth no longer depends on the platform's encoder.
 
-[Unreleased]: https://github.com/samsonjs/SJSAssetExportSession/compare/0.4.1...HEAD
+[0.5.0]: https://github.com/samsonjs/SJSAssetExportSession/compare/0.4.1...https://github.com/samsonjs/SJSAssetExportSession/compare/0.5.0
 
 ## [0.4.1] - 2026-10-07
 
