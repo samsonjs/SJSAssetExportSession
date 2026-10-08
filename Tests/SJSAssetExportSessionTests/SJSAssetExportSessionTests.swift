@@ -7,6 +7,7 @@
 
 import AVFoundation
 import CoreLocation
+import os
 import SJSAssetExportSession
 import Testing
 
@@ -175,7 +176,15 @@ final class ExportSessionTests: BaseTests {
         let fps = try await videoTrack.load(.nominalFrameRate)
         #expect(Int(fps.rounded()) == 30)
         let dataRate = try await videoTrack.load(.estimatedDataRate)
-        #expect((2_400_000 ... 2_700_000).contains(dataRate))
+        // The simulator lands on 2,646,685 every run, the same as macOS's software encoder. The
+        // hardware encoder drifts with load: about 2.57 Mbps when this test runs alone and up to
+        // 2.9 Mbps when the whole suite runs in parallel.
+        #if targetEnvironment(simulator)
+        let expectedDataRate: ClosedRange<Float> = 2_600_000 ... 2_700_000
+        #else
+        let expectedDataRate: ClosedRange<Float> = 2_400_000 ... 3_100_000
+        #endif
+        #expect(expectedDataRate.contains(dataRate))
         let videoFormat = try #require(await videoTrack.load(.formatDescriptions).first)
         #expect(videoFormat.mediaType == .video)
         #expect(videoFormat.mediaSubType == .h264)
@@ -298,6 +307,11 @@ final class ExportSessionTests: BaseTests {
     @Test func test_export_cancellation() async throws {
         let sourceURL = resourceURL(named: "test-720p-h264-24fps.mov")
         let destinationURL💥 = makeTemporaryURL()
+        // Hold the first frame until the task is cancelled so the export can't finish first, no
+        // matter how slowly this test gets scheduled.
+        let (firstFrameStarted, firstFrameContinuation) = AsyncStream<Void>.makeStream()
+        let taskCancelled = DispatchSemaphore(value: 0)
+        let isFirstFrame = OSAllocatedUnfairLock(initialState: true)
         let subject = ExportSession()
         let task = Task {
             let sourceAsset = AVURLAsset(url: sourceURL, options: [
@@ -306,19 +320,28 @@ final class ExportSessionTests: BaseTests {
             try await subject.export(
                 asset: sourceAsset,
                 video: .codec(.h264, width: 1280, height: 720),
+                drawFrame: { _ in
+                    let isFirst = isFirstFrame.withLock { isFirst in
+                        defer { isFirst = false }
+                        return isFirst
+                    }
+                    if isFirst {
+                        firstFrameContinuation.yield()
+                        taskCancelled.wait()
+                    }
+                },
                 to: destinationURL💥.url,
                 as: .mov
             )
-            Issue.record("Task should be cancelled long before we get here")
         }
-        NSLog("Waiting for encoding to begin...")
-        for await progress in subject.progressStream where progress > 0 {
+        for await _ in firstFrameStarted {
             break
         }
-        NSLog("Cancelling task")
         task.cancel()
-        try? await task.value // Wait for task to complete
-        NSLog("Task has finished executing")
+        taskCancelled.signal()
+        await #expect(throws: CancellationError.self) {
+            try await task.value
+        }
     }
 
     @Test func test_writing_metadata() async throws {
