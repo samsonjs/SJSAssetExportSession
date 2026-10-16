@@ -334,6 +334,7 @@ actor SampleWriter {
         var settings: [String: any Sendable] = [AVFormatIDKey: kAudioFormatLinearPCM]
         settings[AVSampleRateKey] = outputSettings[AVSampleRateKey]
         settings[AVNumberOfChannelsKey] = outputSettings[AVNumberOfChannelsKey]
+        settings[AVChannelLayoutKey] = outputSettings[AVChannelLayoutKey]
         return settings
     }
 
@@ -366,6 +367,11 @@ actor SampleWriter {
     ) throws {
         guard !outputSettings.isEmpty else { throw Error.setupFailure(.audioSettingsEmpty) }
         guard writer.canApply(outputSettings: outputSettings, forMediaType: .audio) else {
+            throw Error.setupFailure(.audioSettingsInvalid)
+        }
+        // canApply passes these, but creating the writer input then raises an exception.
+        let channels = (outputSettings[AVNumberOfChannelsKey] as? NSNumber)?.intValue ?? 0
+        if channels > 2, outputSettings[AVChannelLayoutKey] == nil {
             throw Error.setupFailure(.audioSettingsInvalid)
         }
     }

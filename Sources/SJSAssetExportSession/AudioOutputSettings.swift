@@ -48,18 +48,34 @@ public struct AudioOutputSettings: Hashable, Sendable, Codable {
         .init(format: format, channels: channels, sampleRate: sampleRate)
     }
 
+    /// The settings for an `AVAssetWriterInput`. More than two channels get the AAC layout for that
+    /// many channels, since the writer input raises an exception without one. The AAC encoder writes
+    /// its own layout for each channel count whatever layout it's given, so there's no other choice.
     public var settingsDictionary: [String: any Sendable] {
+        var settings: [String: any Sendable] = [
+            AVFormatIDKey: format,
+            AVNumberOfChannelsKey: NSNumber(value: channels),
+        ]
         if let sampleRate {
-            [
-                AVFormatIDKey: format,
-                AVNumberOfChannelsKey: NSNumber(value: channels),
-                AVSampleRateKey: NSNumber(value: Float(sampleRate)),
-            ]
-        } else {
-            [
-                AVFormatIDKey: format,
-                AVNumberOfChannelsKey: NSNumber(value: channels),
-            ]
+            settings[AVSampleRateKey] = NSNumber(value: Float(sampleRate))
+        }
+        if let layoutTag = Self.layoutTag(channels: channels) {
+            var layout = AudioChannelLayout()
+            layout.mChannelLayoutTag = layoutTag
+            settings[AVChannelLayoutKey] = Data(bytes: &layout, count: MemoryLayout<AudioChannelLayout>.size)
+        }
+        return settings
+    }
+
+    private static func layoutTag(channels: Int) -> AudioChannelLayoutTag? {
+        switch channels {
+        case 3: kAudioChannelLayoutTag_AAC_3_0
+        case 4: kAudioChannelLayoutTag_AAC_Quadraphonic
+        case 5: kAudioChannelLayoutTag_AAC_5_0
+        case 6: kAudioChannelLayoutTag_AAC_5_1
+        case 7: kAudioChannelLayoutTag_AAC_6_1
+        case 8: kAudioChannelLayoutTag_AAC_7_1
+        default: nil
         }
     }
 }
