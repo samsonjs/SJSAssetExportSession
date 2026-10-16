@@ -398,6 +398,66 @@ final class ExportSessionTests: BaseTests {
         #expect(audioFormat.audioStreamBasicDescription?.mChannelsPerFrame == 2)
     }
 
+    @Test func test_keeps_surround_audio_when_the_output_asks_for_it() async throws {
+        let sourceURL = resourceURL(named: "test-5.1-audio.mp4")
+        let destinationURL = makeTemporaryURL()
+
+        let subject = ExportSession()
+        try await subject.export(
+            asset: makeAsset(url: sourceURL),
+            audio: .format(.aac).channels(6).sampleRate(48_000),
+            video: .codec(.h264, size: CGSize(width: 64, height: 64)),
+            to: destinationURL.url,
+            as: .mp4
+        )
+
+        let exportedAsset = AVURLAsset(url: destinationURL.url)
+        let audioTrack = try #require(await exportedAsset.loadTracks(withMediaType: .audio).first)
+        let audioFormat = try #require(await audioTrack.load(.formatDescriptions).first)
+        #expect(audioFormat.mediaSubType == .mpeg4AAC)
+        #expect(audioFormat.audioStreamBasicDescription?.mChannelsPerFrame == 6)
+        #expect(audioFormat.audioStreamBasicDescription?.mSampleRate == 48_000)
+        #expect(audioFormat.audioChannelLayout?.tag == kAudioChannelLayoutTag_AAC_5_1)
+    }
+
+    @Test func test_downmixes_surround_audio_to_mono() async throws {
+        let sourceURL = resourceURL(named: "test-5.1-audio.mp4")
+        let destinationURL = makeTemporaryURL()
+
+        let subject = ExportSession()
+        try await subject.export(
+            asset: makeAsset(url: sourceURL),
+            audio: .format(.aac).channels(1).sampleRate(48_000),
+            video: .codec(.h264, size: CGSize(width: 64, height: 64)),
+            to: destinationURL.url,
+            as: .mp4
+        )
+
+        let exportedAsset = AVURLAsset(url: destinationURL.url)
+        let audioTrack = try #require(await exportedAsset.loadTracks(withMediaType: .audio).first)
+        let audioFormat = try #require(await audioTrack.load(.formatDescriptions).first)
+        #expect(audioFormat.audioStreamBasicDescription?.mChannelsPerFrame == 1)
+    }
+
+    @Test func test_export_throws_for_surround_settings_without_a_layout() async throws {
+        try await #require(throws: ExportSession.Error.setupFailure(.audioSettingsInvalid)) {
+            let sourceURL = self.resourceURL(named: "test-5.1-audio.mp4")
+
+            let subject = ExportSession()
+            try await subject.export(
+                asset: self.makeAsset(url: sourceURL),
+                audioOutputSettings: [
+                    AVFormatIDKey: kAudioFormatMPEG4AAC,
+                    AVNumberOfChannelsKey: NSNumber(value: 6),
+                ],
+                videoOutputSettings: VideoOutputSettings
+                    .codec(.h264, size: CGSize(width: 64, height: 64)).settingsDictionary,
+                to: self.makeTemporaryURL().url,
+                as: .mp4
+            )
+        }
+    }
+
     @Test func test_works_with_spatial_audio_track() async throws {
         let sourceURL = resourceURL(named: "test-spatial-audio.mov")
         let destinationURL = makeTemporaryURL()
