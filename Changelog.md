@@ -2,10 +2,17 @@
 
 ## [Unreleased]
 
+### Added/Changed/Fixed
+- Your change here.
+
+[Unreleased]: https://github.com/samsonjs/SJSAssetExportSession/compare/0.5.2...HEAD
+
+## [0.5.2] - 2026-10-16
+
 ### Fixed
 - Fixed exports with more than two audio channels crashing. `AudioOutputSettings` now includes the AAC channel layout for 3 to 8 channels, which the writer input requires, and the reader mixes to the same layout. Raw audio settings with more than two channels and no `AVChannelLayoutKey` now throw `setupFailure(.audioSettingsInvalid)` instead of raising an exception.
 
-[Unreleased]: https://github.com/samsonjs/SJSAssetExportSession/compare/0.5.1...HEAD
+[0.5.2]: https://github.com/samsonjs/SJSAssetExportSession/compare/0.5.1...0.5.2
 
 ## [0.5.1] - 2026-10-07
 
