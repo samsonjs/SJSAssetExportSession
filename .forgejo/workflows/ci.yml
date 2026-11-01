@@ -93,5 +93,9 @@ jobs:
         with:
           xcode-version: ${{ matrix.xcode }}
 
+      # The export tests fail with AVFoundation -11800 when two runs encode on
+      # the same Mac at once, and a runner takes more than one job, so the
+      # matrix entries wait their turn here. Forgejo ignores max-parallel.
+      # lockf's lock dies with the process, so a killed job can't leave one.
       - name: Run tests
-        run: swift test
+        run: lockf -k "$HOME/Library/Caches/sjs-asset-export-session-tests.lock" swift test
