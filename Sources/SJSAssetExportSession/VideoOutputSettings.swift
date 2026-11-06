@@ -150,6 +150,30 @@ public struct VideoOutputSettings: Hashable, Sendable, Codable {
 
 extension AVMutableVideoComposition {
     func applyingSettings(_ settings: VideoOutputSettings) -> AVMutableVideoComposition {
+        if renderSize != settings.size, renderSize.width > 0, renderSize.height > 0 {
+            let scale = CGAffineTransform(
+                scaleX: settings.size.width / renderSize.width,
+                y: settings.size.height / renderSize.height
+            )
+            
+            instructions = instructions.map { instruction in
+                guard let instruction = instruction as? AVVideoCompositionInstruction,
+                      let scaled = instruction.mutableCopy() as? AVMutableVideoCompositionInstruction
+                else { return instruction }
+                scaled.layerInstructions = instruction.layerInstructions.map { layer in
+                    var start = CGAffineTransform.identity
+                    var end = CGAffineTransform.identity
+					guard layer.getTransformRamp(for: instruction.timeRange.start, start: &start, end: &end, timeRange: nil) else {
+						return layer
+					}
+                    let scaledLayer = AVMutableVideoCompositionLayerInstruction()
+                    scaledLayer.trackID = layer.trackID
+					scaledLayer.setTransformRamp(fromStart: start.concatenating(scale), toEnd: end.concatenating(scale), timeRange: instruction.timeRange)
+                    return scaledLayer
+                }
+                return scaled
+            }
+        }
         renderSize = settings.size
         if let fps = settings.fps {
             sourceTrackIDForFrameTiming = kCMPersistentTrackID_Invalid
