@@ -55,8 +55,9 @@ public final class ExportSession: Sendable {
         as fileType: AVFileType
     ) async throws {
         let videoComposition = try await AVMutableVideoComposition.videoComposition(
-            withPropertiesOf: asset
-        ).applyingSettings(video)
+            for: asset,
+            settings: video
+        )
         let sampleWriter = try await SampleWriter(
             asset: asset,
             audioOutputSettings: audio.settingsDictionary,
@@ -130,8 +131,9 @@ public final class ExportSession: Sendable {
                 let height = (videoOutputSettings[AVVideoHeightKey] as? NSNumber)?.intValue
         {
             try await AVMutableVideoComposition.videoComposition(
-                withPropertiesOf: asset
-            ).applyingSettings(.codec(.h264, width: width, height: height))
+                for: asset,
+                settings: .codec(.h264, width: width, height: height)
+            )
         } else {
             try await AVMutableVideoComposition.videoComposition(
                 withPropertiesOf: asset
