@@ -8,8 +8,9 @@
 import AVFoundation
 import VideoToolbox
 
-/// Hands the writer the composition's frames, drawn into by the artist, at the composition's
-/// frame rate when it times its frames with `frameDuration`.
+/// Hands the writer the composition's frames, scaled to the output size when there's a scaler,
+/// drawn into by the artist, at the composition's frame rate when it times its frames with
+/// `frameDuration`.
 ///
 /// The built-in compositor only emits the source's own frames, even when the composition asks
 /// for a steady rate, so a 2 fps screen recording exported at 30 fps would come out at 2 fps.
@@ -22,6 +23,7 @@ final class VideoFrameSource {
     private let colour: FrameColour
     private var timeline: FrameTimeline?
     private let copier = PixelBufferCopier()
+    private let scaler: FrameScaler?
 
     /// The source frame being shown, the one after it, and the output times left to show it at.
     private var current: CMSampleBuffer?
@@ -32,10 +34,12 @@ final class VideoFrameSource {
     init(
         output: AVAssetReaderVideoCompositionOutput,
         videoComposition: AVVideoComposition,
+        scaler: FrameScaler? = nil,
         timeRange: CMTimeRange,
         drawFrame: sending FrameArtist?
     ) {
         self.output = output
+        self.scaler = scaler
         self.drawFrame = drawFrame
         colour = FrameColour(of: videoComposition)
         let frameDuration = videoComposition.frameDuration
@@ -49,16 +53,16 @@ final class VideoFrameSource {
     /// The next frame for the writer, or nil when there are no more.
     func next() throws -> CMSampleBuffer? {
         guard timeline != nil else {
-            guard let sample = output.copyNextSampleBuffer() else { return nil }
+            guard let sample = try read() else { return nil }
 
             try draw(into: sample, at: CMSampleBufferGetPresentationTimeStamp(sample))
             return sample
         }
 
         while pendingTimes.isEmpty {
-            guard let sample = upcoming ?? output.copyNextSampleBuffer() else { return nil }
+            guard let sample = try upcoming ?? read() else { return nil }
 
-            let next = output.copyNextSampleBuffer()
+            let next = try read()
             let times = timeline?.times(before: next.map(CMSampleBufferGetPresentationTimeStamp)) ?? []
             current = sample
             upcoming = next
@@ -85,6 +89,23 @@ final class VideoFrameSource {
             imageBuffer: copy,
             formatDescription: CMVideoFormatDescription(imageBuffer: copy),
             sampleTiming: timing
+        )
+    }
+
+    /// The reader's next frame, scaled to the output size when the composition renders at another.
+    private func read() throws -> CMSampleBuffer? {
+        guard let sample = output.copyNextSampleBuffer() else { return nil }
+        guard let scaler, let source = CMSampleBufferGetImageBuffer(sample) else { return sample }
+
+        let scaled = try scaler.scale(source)
+        return try CMSampleBuffer(
+            imageBuffer: scaled,
+            formatDescription: CMVideoFormatDescription(imageBuffer: scaled),
+            sampleTiming: CMSampleTimingInfo(
+                duration: sample.duration,
+                presentationTimeStamp: sample.presentationTimeStamp,
+                decodeTimeStamp: .invalid
+            )
         )
     }
 

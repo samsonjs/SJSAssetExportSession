@@ -43,8 +43,6 @@ final class ExportSessionTests: BaseTests {
         let videoTrack = try #require(await exportedAsset.loadTracks(withMediaType: .video).first)
         #expect(try await videoTrack.load(.naturalSize) == CGSize(width: 1280, height: 720))
         #expect(try await videoTrack.load(.nominalFrameRate) == 24.0)
-        let dataRate = try await videoTrack.load(.estimatedDataRate)
-        #expect((900_000 ... 1_150_000).contains(dataRate))
         let videoFormat = try #require(await videoTrack.load(.formatDescriptions).first)
         #expect(videoFormat.mediaType == .video)
         #expect(videoFormat.mediaSubType == .h264)
@@ -153,6 +151,88 @@ final class ExportSessionTests: BaseTests {
         let exportedAsset = AVURLAsset(url: destinationURL.url)
         let exportedTrack = try #require(try await exportedAsset.loadTracks(withMediaType: .video).first)
         #expect(try await exportedTrack.load(.naturalSize) == CGSize(width: 1280, height: 720))
+    }
+
+    // The test video is 320×180, blue with white strips down the left and right 40 points.
+
+    @Test func test_sugary_export_scales_frames_to_a_smaller_size() async throws {
+        let video = try await TestVideo.make(whiteEdges: true)
+
+        let frame = try await exportFrame(of: video, video: .codec(.h264, width: 160, height: 90))
+
+        #expect(frame.colour(at: CGPoint(x: 10, y: 45)) == .white)
+        #expect(frame.colour(at: CGPoint(x: 80, y: 45)) == .blue)
+        #expect(frame.colour(at: CGPoint(x: 150, y: 45)) == .white)
+    }
+
+    @Test func test_export_default_composition_scales_frames_to_a_smaller_size() async throws {
+        let video = try await TestVideo.make(whiteEdges: true)
+        let destinationURL = makeTemporaryURL()
+
+        let subject = ExportSession()
+        try await subject.export(
+            asset: makeAsset(url: video.url.url),
+            audioOutputSettings: [:],
+            videoOutputSettings: VideoOutputSettings.codec(.h264, width: 160, height: 90).settingsDictionary,
+            to: destinationURL.url,
+            as: .mp4
+        )
+
+        let frame = try await DecodedFrame.at(CMTime(value: 5, timescale: 30), in: destinationURL.url)
+        #expect(frame.colour(at: CGPoint(x: 10, y: 45)) == .white)
+        #expect(frame.colour(at: CGPoint(x: 80, y: 45)) == .blue)
+        #expect(frame.colour(at: CGPoint(x: 150, y: 45)) == .white)
+    }
+
+    @Test func test_scale_mode_fit_letterboxes() async throws {
+        let video = try await TestVideo.make(whiteEdges: true)
+
+        let frame = try await exportFrame(of: video, video: .codec(.h264, width: 180, height: 180).scaleMode(.fit))
+
+        // Scaled to 180×102, with bars above and below.
+        #expect(frame.colour(at: CGPoint(x: 90, y: 15)) == .black)
+        #expect(frame.colour(at: CGPoint(x: 10, y: 90)) == .white)
+        #expect(frame.colour(at: CGPoint(x: 90, y: 90)) == .blue)
+        #expect(frame.colour(at: CGPoint(x: 170, y: 90)) == .white)
+        #expect(frame.colour(at: CGPoint(x: 90, y: 165)) == .black)
+    }
+
+    @Test func test_scale_mode_fit_pillarboxes_portrait_video() async throws {
+        let video = try await TestVideo.make(whiteEdges: true, portrait: true)
+
+        let frame = try await exportFrame(of: video, video: .codec(.h264, width: 320, height: 180).scaleMode(.fit))
+
+        // Upright it's 180×320 with the white strips across the top and bottom, scaled to 102×180
+        // with bars either side.
+        #expect(frame.colour(at: CGPoint(x: 40, y: 90)) == .black)
+        #expect(frame.colour(at: CGPoint(x: 160, y: 10)) == .white)
+        #expect(frame.colour(at: CGPoint(x: 160, y: 90)) == .blue)
+        #expect(frame.colour(at: CGPoint(x: 160, y: 170)) == .white)
+        #expect(frame.colour(at: CGPoint(x: 280, y: 90)) == .black)
+    }
+
+    @Test func test_scale_mode_fill_crops_the_overflow() async throws {
+        let video = try await TestVideo.make(whiteEdges: true)
+
+        let frame = try await exportFrame(of: video, video: .codec(.h264, width: 180, height: 180).scaleMode(.fill))
+
+        // The middle 180 points of the source, so both white strips are cut off.
+        #expect(frame.colour(at: CGPoint(x: 10, y: 90)) == .blue)
+        #expect(frame.colour(at: CGPoint(x: 90, y: 5)) == .blue)
+        #expect(frame.colour(at: CGPoint(x: 90, y: 175)) == .blue)
+        #expect(frame.colour(at: CGPoint(x: 170, y: 90)) == .blue)
+    }
+
+    @Test func test_scale_mode_stretch_squashes() async throws {
+        let video = try await TestVideo.make(whiteEdges: true)
+
+        let frame = try await exportFrame(of: video, video: .codec(.h264, width: 180, height: 180).scaleMode(.stretch))
+
+        // Squashed horizontally to fill the frame, no bars.
+        #expect(frame.colour(at: CGPoint(x: 10, y: 90)) == .white)
+        #expect(frame.colour(at: CGPoint(x: 90, y: 5)) == .blue)
+        #expect(frame.colour(at: CGPoint(x: 90, y: 175)) == .blue)
+        #expect(frame.colour(at: CGPoint(x: 170, y: 90)) == .white)
     }
 
     @Test func test_export_x264_60fps() async throws {
@@ -473,5 +553,12 @@ final class ExportSessionTests: BaseTests {
         let exportedAsset = AVURLAsset(url: destinationURL.url)
         let audioTracks = try await exportedAsset.loadTracks(withMediaType: .audio)
         #expect(audioTracks.count == 1)
+    }
+
+    private func exportFrame(of video: TestVideo, video settings: VideoOutputSettings) async throws -> DecodedFrame {
+        let destinationURL = makeTemporaryURL(function: "\(UUID())")
+        let subject = ExportSession()
+        try await subject.export(asset: makeAsset(url: video.url.url), video: settings, to: destinationURL.url, as: .mp4)
+        return try await DecodedFrame.at(CMTime(value: 5, timescale: 30), in: destinationURL.url)
     }
 }

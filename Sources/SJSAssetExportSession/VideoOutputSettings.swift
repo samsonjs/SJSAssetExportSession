@@ -10,7 +10,7 @@ import VideoToolbox
 
 /// A convenient API for constructing video settings dictionaries.
 ///
-/// Construct this by starting with ``VideoOutputSettings/codec(_:size:)`` or ``VideoOutputSettings/codec(_:width:height:)`` and then chaining calls to further customize it, if desired, using ``fps(_:)``, ``bitrate(_:)``, and ``color(_:)``.
+/// Construct this by starting with ``VideoOutputSettings/codec(_:size:)`` or ``VideoOutputSettings/codec(_:width:height:)`` and then chaining calls to further customize it, if desired, using ``scaleMode(_:)``, ``fps(_:)``, ``bitrate(_:)``, and ``color(_:)``.
 ///
 /// Setting the fps and colour also needs support from the `AVVideoComposition` and these settings can be applied to them with ``VideoOutputSettings/apply(to:)``.
 public struct VideoOutputSettings: Hashable, Sendable, Codable {
@@ -94,30 +94,46 @@ public struct VideoOutputSettings: Hashable, Sendable, Codable {
         }
     }
 
+    /// How the source is scaled to the output size when the two differ.
+    public enum ScaleMode: Hashable, Sendable, Codable {
+        /// Scale to fit inside the size, keeping the aspect ratio. Video will be pillarboxed or letterboxed.
+        case fit
+        /// Scale to cover the size, keeping the aspect ratio, and crop what overflows.
+        case fill
+        /// Scale each axis independently to the size, distorting the picture when the aspect ratio differs.
+        case stretch
+    }
+
     public let codec: Codec
     public let size: CGSize
+    public let scaleMode: ScaleMode
     public let fps: Int?
     public let bitrate: Int?
     public let color: Color?
 
+    /// Starts with the given codec and size, scaling to fit by default.
     public static func codec(_ codec: Codec, size: CGSize) -> VideoOutputSettings {
-        .init(codec: codec, size: size, fps: nil, bitrate: nil, color: nil)
+        .init(codec: codec, size: size, scaleMode: .fit, fps: nil, bitrate: nil, color: nil)
     }
 
     public static func codec(_ codec: Codec, width: Int, height: Int) -> VideoOutputSettings {
         .codec(codec, size: CGSize(width: width, height: height))
     }
 
+    public func scaleMode(_ scaleMode: ScaleMode) -> VideoOutputSettings {
+        .init(codec: codec, size: size, scaleMode: scaleMode, fps: fps, bitrate: bitrate, color: color)
+    }
+
     public func fps(_ fps: Int?) -> VideoOutputSettings {
-        .init(codec: codec, size: size, fps: fps, bitrate: bitrate, color: color)
+        .init(codec: codec, size: size, scaleMode: scaleMode, fps: fps, bitrate: bitrate, color: color)
     }
 
     public func bitrate(_ bitrate: Int?) -> VideoOutputSettings {
-        .init(codec: codec, size: size, fps: fps, bitrate: bitrate, color: color)
+        .init(codec: codec, size: size, scaleMode: scaleMode, fps: fps, bitrate: bitrate, color: color)
     }
 
     public func color(_ color: Color?) -> VideoOutputSettings {
-        .init(codec: codec, size: size, fps: fps, bitrate: bitrate, color: color)
+        .init(codec: codec, size: size, scaleMode: scaleMode, fps: fps, bitrate: bitrate, color: color)
     }
 
     public var settingsDictionary: [String: any Sendable] {
@@ -142,15 +158,32 @@ public struct VideoOutputSettings: Hashable, Sendable, Codable {
         return result
     }
 
-    /// Applies the subset of relevant settings to the given video composition, namely fps and colour.
+    /// Applies the subset of relevant settings to the given video composition, namely render size, fps and colour.
+    ///
+    /// Setting the render size doesn't scale the video, so a smaller size crops the frame unless the composition's layer instructions scale it.
     public func apply(to videoComposition: AVMutableVideoComposition) {
-        _ = videoComposition.applyingSettings(self)
+        videoComposition.renderSize = size
+        _ = videoComposition.applyingFrameRateAndColour(self)
+    }
+}
+
+extension VideoOutputSettings {
+    // Settings encoded before there was a scale mode have no value for it.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        try self.init(
+            codec: container.decode(Codec.self, forKey: .codec),
+            size: container.decode(CGSize.self, forKey: .size),
+            scaleMode: container.decodeIfPresent(ScaleMode.self, forKey: .scaleMode) ?? .fit,
+            fps: container.decodeIfPresent(Int.self, forKey: .fps),
+            bitrate: container.decodeIfPresent(Int.self, forKey: .bitrate),
+            color: container.decodeIfPresent(Color.self, forKey: .color)
+        )
     }
 }
 
 extension AVMutableVideoComposition {
-    func applyingSettings(_ settings: VideoOutputSettings) -> AVMutableVideoComposition {
-        renderSize = settings.size
+    func applyingFrameRateAndColour(_ settings: VideoOutputSettings) -> AVMutableVideoComposition {
         if let fps = settings.fps {
             sourceTrackIDForFrameTiming = kCMPersistentTrackID_Invalid
             frameDuration = CMTime(seconds: 1.0 / Double(fps), preferredTimescale: 600)
