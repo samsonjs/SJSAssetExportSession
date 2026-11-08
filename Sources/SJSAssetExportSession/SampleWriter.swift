@@ -58,6 +58,7 @@ actor SampleWriter {
         audioMix: sending AVAudioMix?,
         videoOutputSettings: sending [String: any Sendable],
         videoComposition: sending AVVideoComposition,
+        scaleMode: VideoOutputSettings.ScaleMode? = nil,
         timeRange: CMTimeRange? = nil,
         optimizeForNetworkUse: Bool = false,
         metadata: [AVMetadataItem] = [],
@@ -124,10 +125,10 @@ actor SampleWriter {
             .filterAsync { try await $0.load(.isEnabled) }
         guard !videoTracks.isEmpty else { throw Error.setupFailure(.videoTracksEmpty) }
         try Self.validateVideo(outputSettings: videoOutputSettings, writer: writer)
-        Self.warnAboutMismatchedVideoSize(
-            renderSize: videoComposition.renderSize,
-            settings: videoOutputSettings
-        )
+        let outputSize = Self.size(in: videoOutputSettings)
+        if scaleMode == nil {
+            Self.warnAboutMismatchedVideoSize(renderSize: videoComposition.renderSize, outputSize: outputSize)
+        }
         let videoOutput = AVAssetReaderVideoCompositionOutput(
             videoTracks: videoTracks,
             videoSettings: Self.readerVideoSettings(for: videoComposition)
@@ -139,9 +140,15 @@ actor SampleWriter {
         }
         reader.add(videoOutput)
         self.videoOutput = videoOutput
+        let scaler: FrameScaler? = if let scaleMode, let outputSize, outputSize != videoComposition.renderSize {
+            FrameScaler(size: outputSize, mode: scaleMode)
+        } else {
+            nil
+        }
         videoFrames = VideoFrameSource(
             output: videoOutput,
             videoComposition: videoComposition,
+            scaler: scaler,
             timeRange: timeRange,
             drawFrame: drawFrame
         )
@@ -385,19 +392,22 @@ actor SampleWriter {
         }
     }
 
-    private static func warnAboutMismatchedVideoSize(
-        renderSize: CGSize,
-        settings: [String: any Sendable]
-    ) {
-        guard let settingsWidth = (settings[AVVideoWidthKey] as? NSNumber)?.intValue,
-              let settingsHeight = (settings[AVVideoHeightKey] as? NSNumber)?.intValue
-        else { return }
+    private static func size(in settings: [String: any Sendable]) -> CGSize? {
+        guard let width = (settings[AVVideoWidthKey] as? NSNumber)?.intValue,
+              let height = (settings[AVVideoHeightKey] as? NSNumber)?.intValue
+        else { return nil }
+
+        return CGSize(width: width, height: height)
+    }
+
+    private static func warnAboutMismatchedVideoSize(renderSize: CGSize, outputSize: CGSize?) {
+        guard let outputSize, renderSize != outputSize else { return }
 
         let renderWidth = Int(renderSize.width)
         let renderHeight = Int(renderSize.height)
-        if renderWidth != settingsWidth || renderHeight != settingsHeight {
-            log.warning("Video composition's render size (\(renderWidth)ｘ\(renderHeight)) will be overridden by video output settings (\(settingsWidth)ｘ\(settingsHeight))")
-        }
+        let outputWidth = Int(outputSize.width)
+        let outputHeight = Int(outputSize.height)
+        log.warning("Video composition's render size (\(renderWidth)ｘ\(renderHeight)) will be overridden by video output settings (\(outputWidth)ｘ\(outputHeight))")
     }
 }
 

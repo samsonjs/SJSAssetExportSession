@@ -56,13 +56,14 @@ public final class ExportSession: Sendable {
     ) async throws {
         let videoComposition = try await AVMutableVideoComposition.videoComposition(
             withPropertiesOf: asset
-        ).applyingSettings(video)
+        ).applyingFrameRateAndColour(video)
         let sampleWriter = try await SampleWriter(
             asset: asset,
             audioOutputSettings: audio.settingsDictionary,
             audioMix: mix,
             videoOutputSettings: video.settingsDictionary,
             videoComposition: videoComposition,
+            scaleMode: video.scaleMode,
             timeRange: timeRange,
             optimizeForNetworkUse: optimizeForNetworkUse,
             metadata: metadata,
@@ -101,7 +102,7 @@ public final class ExportSession: Sendable {
           - `AVVideoWidthKey` with an integer as an `NSNumber`, optional when a video composition is given
           - `AVVideoHeightKey` with an integer as an `NSNumber`, optional when a video composition is given
 
-       - composition: An optional composition that can be used to manipulate the video in some way. This can scale the video, apply filters, or ramp audio volume, amongst other edits.
+       - composition: An optional composition that can be used to manipulate the video in some way. This can scale the video, apply filters, or ramp audio volume, amongst other edits. Without one, frames are scaled to fit the size in `videoOutputSettings`. With one, it's used as is and has to do any scaling itself.
 
        - drawFrame: An optional ``FrameArtist`` that draws into each video frame, in place, before it's encoded. See ``FrameArtist`` for when it's called and what it can rely on.
 
@@ -124,18 +125,12 @@ public final class ExportSession: Sendable {
         to outputURL: URL,
         as fileType: AVFileType
     ) async throws {
-        let videoComposition: AVVideoComposition =
-        if let composition { composition }
-        else if let width = (videoOutputSettings[AVVideoWidthKey] as? NSNumber)?.intValue,
-                let height = (videoOutputSettings[AVVideoHeightKey] as? NSNumber)?.intValue
-        {
-            try await AVMutableVideoComposition.videoComposition(
-                withPropertiesOf: asset
-            ).applyingSettings(.codec(.h264, width: width, height: height))
+        // Frames from our own composition come out at the source size and are scaled to fit.
+        let scaleMode: VideoOutputSettings.ScaleMode? = composition == nil ? .fit : nil
+        let videoComposition: AVVideoComposition = if let composition {
+            composition
         } else {
-            try await AVMutableVideoComposition.videoComposition(
-                withPropertiesOf: asset
-            )
+            try await AVMutableVideoComposition.videoComposition(withPropertiesOf: asset)
         }
         var videoOutputSettings = videoOutputSettings
         if videoOutputSettings[AVVideoWidthKey] == nil || videoOutputSettings[AVVideoHeightKey] == nil {
@@ -149,6 +144,7 @@ public final class ExportSession: Sendable {
             audioMix: mix,
             videoOutputSettings: videoOutputSettings,
             videoComposition: videoComposition,
+            scaleMode: scaleMode,
             timeRange: timeRange,
             optimizeForNetworkUse: optimizeForNetworkUse,
             metadata: metadata,

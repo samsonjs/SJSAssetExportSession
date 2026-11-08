@@ -10,7 +10,9 @@ import CoreGraphics
 import Testing
 
 /// A short, silent, solid blue H.264 video written for a test, so frames drawn over it are easy
-/// to tell apart from the source.
+/// to tell apart from the source. With `whiteEdges` the left and right 40 points are white, so a
+/// frame that was scaled can be told apart from one that was cropped. With `portrait` the track's
+/// preferred transform turns it a quarter turn, the way a phone records portrait video.
 struct TestVideo {
     static let size = CGSize(width: 320, height: 180)
 
@@ -22,7 +24,12 @@ struct TestVideo {
         CMTime(value: CMTimeValue(frameCount), timescale: fps)
     }
 
-    static func make(fps: Int32 = 30, frameCount: Int = 10) async throws -> TestVideo {
+    static func make(
+        fps: Int32 = 30,
+        frameCount: Int = 10,
+        whiteEdges: Bool = false,
+        portrait: Bool = false
+    ) async throws -> TestVideo {
         let url = URL.temporaryDirectory.appending(component: "test-video-\(UUID().uuidString).mp4")
         let writer = try AVAssetWriter(outputURL: url, fileType: .mp4)
         let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
@@ -30,6 +37,9 @@ struct TestVideo {
             AVVideoWidthKey: Int(size.width),
             AVVideoHeightKey: Int(size.height),
         ])
+        if portrait {
+            input.transform = CGAffineTransform(a: 0, b: 1, c: -1, d: 0, tx: size.height, ty: 0)
+        }
         let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input, sourcePixelBufferAttributes: [
             kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
             kCVPixelBufferWidthKey as String: Int(size.width),
@@ -38,7 +48,7 @@ struct TestVideo {
         writer.add(input)
         writer.startWriting()
         writer.startSession(atSourceTime: .zero)
-        let frame = try makeBlueFrame()
+        let frame = try makeFrame(whiteEdges: whiteEdges)
         for index in 0 ..< frameCount {
             while !input.isReadyForMoreMediaData {
                 try await Task.sleep(for: .milliseconds(5))
@@ -53,7 +63,7 @@ struct TestVideo {
         return TestVideo(url: AutoDestructingURL(url: url), fps: fps, frameCount: frameCount)
     }
 
-    private static func makeBlueFrame() throws -> CVPixelBuffer {
+    private static func makeFrame(whiteEdges: Bool) throws -> CVPixelBuffer {
         var pixelBuffer: CVPixelBuffer?
         CVPixelBufferCreate(nil, Int(size.width), Int(size.height), kCVPixelFormatType_32BGRA, nil, &pixelBuffer)
         guard let pixelBuffer else { throw TestVideoError.writeFailed }
@@ -65,7 +75,9 @@ struct TestVideo {
         for y in 0 ..< Int(size.height) {
             for x in 0 ..< Int(size.width) {
                 let offset = y * bytesPerRow + x * 4
-                (base[offset], base[offset + 1], base[offset + 2], base[offset + 3]) = (255, 0, 0, 255)
+                let isWhite = whiteEdges && (x < 40 || x >= Int(size.width) - 40)
+                let (b, g, r): (UInt8, UInt8, UInt8) = isWhite ? (255, 255, 255) : (255, 0, 0)
+                (base[offset], base[offset + 1], base[offset + 2], base[offset + 3]) = (b, g, r, 255)
             }
         }
         return pixelBuffer

@@ -108,7 +108,7 @@ try await exporter.export(
 
 ### The Most Flexible Way
 
-When you need all the control you can get down to the nitty gritty details. This code does the exact same thing as the code above:
+When you need all the control you can get down to the nitty gritty details. This code uses the same settings as the code above with one difference: a composition you pass in is used as is, so nothing scales it for you. `renderSize` only sets the size of the canvas, so a source larger than 1280×720 is cropped unless your layer instructions scale it too:
 
 ```swift
 let sourceURL = URL.documentsDirectory.appending(component: "some-video.mov")
@@ -195,6 +195,21 @@ try await exporter.export(
     as: .mp4
 )
 ```
+
+### Scaling
+
+When the output size differs from the source, the whole picture is scaled to fit inside it, keeping the aspect ratio, so a portrait video exported at 1280×720 is pillarboxed. Choose another way with `scaleMode(_:)`: `.fill` covers the output and crops what overflows, and `.stretch` scales each axis to the output size, distorting the picture when the aspect ratio differs.
+
+```swift
+try await exporter.export(
+    asset: sourceAsset,
+    video: .codec(.h264, width: 1080, height: 1080).scaleMode(.fill),
+    to: destinationURL,
+    as: .mp4
+)
+```
+
+The raw settings method always fits. With your own composition, the scale mode isn't used; your layer instructions decide what goes where.
 
 ### Frame Rate
 
