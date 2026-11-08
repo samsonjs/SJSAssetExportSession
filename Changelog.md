@@ -2,8 +2,8 @@
 
 ## [Unreleased]
 
-### Added/Changed/Fixed
-- Your change here.
+### Changed
+- CI fails on Swift compiler warnings.
 
 [Unreleased]: https://git.samhuri.net/sjs/SJSAssetExportSession/compare/0.5.2...HEAD
 
