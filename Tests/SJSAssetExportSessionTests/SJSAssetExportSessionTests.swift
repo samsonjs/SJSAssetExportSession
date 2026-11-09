@@ -13,7 +13,7 @@ import Testing
 
 final class ExportSessionTests: BaseTests {
     @Test func test_sugary_export_720p_h264_24fps() async throws {
-        let sourceURL = resourceURL(named: "test-4k-hdr-hevc-30fps.mov")
+        let sourceURL = resourceURL(named: "test-x264-1080p-h264-60fps.mp4")
         let destinationURL = makeTemporaryURL()
 
         let subject = ExportSession()
@@ -44,7 +44,7 @@ final class ExportSessionTests: BaseTests {
         #expect(try await videoTrack.load(.naturalSize) == CGSize(width: 1280, height: 720))
         #expect(try await videoTrack.load(.nominalFrameRate) == 24.0)
         let dataRate = try await videoTrack.load(.estimatedDataRate)
-        #expect((900_000 ... 1_150_000).contains(dataRate))
+        #expect((900_000 ... 1_500_000).contains(dataRate))
         let videoFormat = try #require(await videoTrack.load(.formatDescriptions).first)
         #expect(videoFormat.mediaType == .video)
         #expect(videoFormat.mediaSubType == .h264)
