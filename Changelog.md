@@ -2,13 +2,20 @@
 
 ## [Unreleased]
 
+### Added/Changed/Fixed
+- Your change here.
+
+[Unreleased]: https://git.samhuri.net/sjs/SJSAssetExportSession/compare/0.6.0...HEAD
+
+## [0.6.0] - 2026-11-15
+
 ### Added
 - `VideoOutputSettings.scaleMode(_:)` chooses how the source is scaled when the output size differs: `.fit` (the default) pillarboxes or letterboxes, `.fill` crops the overflow, and `.stretch` distorts.
 
 ### Fixed
 - Fixed exports at a size other than the source's cropping the frame instead of scaling it, when the export builds its own composition. Asking for 1280×720 from a 1920×1080 video gave the top-left 1280×720 of each frame. Frames are now scaled with vImage's high-quality resampling.
 
-[Unreleased]: https://git.samhuri.net/sjs/SJSAssetExportSession/compare/0.5.2...HEAD
+[0.6.0]: https://git.samhuri.net/sjs/SJSAssetExportSession/compare/0.5.2...0.6.0
 
 ## [0.5.2] - 2026-10-16
 
