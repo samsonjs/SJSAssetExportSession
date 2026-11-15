@@ -1,0 +1,91 @@
+# Benchmarks on thetis. The job benchmarks the library before and after a
+# change, on the same machine in the same job, and fails when the change
+# regressed past the thresholds set in Benchmarks/Benchmarks/ExportBenchmarks.
+# Both runs use the newer commit's Benchmarks package, so the base is measured
+# with the same benchmarks even when it predates them.
+#
+# It runs on pushes to main and by hand, comparing a branch with main or any
+# other ref, rather than on every pull request: there's one Mac runner.
+
+name: Benchmarks
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Sources/**"
+      - "Package.swift"
+      - "Benchmarks/**"
+      - ".xcode-version"
+      - ".forgejo/workflows/benchmarks.yml"
+  workflow_dispatch:
+    inputs:
+      base:
+        description: Branch, tag or commit to compare with
+        default: main
+
+concurrency:
+  group: benchmarks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compare:
+    name: Compare with base
+    runs-on: macos-arm64
+    timeout-minutes: 45
+    steps:
+      - name: Check out the change
+        uses: https://git.samhuri.net/sjs/actions/checkout@v1
+        with:
+          path: change
+          require-file: Benchmarks/Package.swift
+
+      - name: Check out the base
+        uses: https://git.samhuri.net/sjs/actions/checkout@v1
+        with:
+          path: base
+          ref: ${{ github.event_name == 'push' && github.event.before || inputs.base }}
+          require-file: Package.swift
+
+      - name: Select Xcode
+        uses: https://git.samhuri.net/sjs/actions/xcode@v1
+        with:
+          working-directory: change
+
+      # Downloads only what isn't already in the runner's cache directory.
+      - name: Fetch media
+        run: change/Benchmarks/fetch-media
+
+      # Both runs take the same lock as the tests in ci.yml, because two
+      # exports encoding on this Mac at once fail with AVFoundation -11800.
+      - name: Benchmark the base
+        run: |
+          rm -rf base/Benchmarks
+          cp -R change/Benchmarks base/Benchmarks
+          cd base/Benchmarks
+          lockf -k "$HOME/Library/Caches/sjs-asset-export-session-tests.lock" \
+            swift package --disable-sandbox --allow-writing-to-package-directory \
+            benchmark baseline update base --no-progress
+
+      - name: Benchmark the change
+        working-directory: change/Benchmarks
+        run: |
+          lockf -k "$HOME/Library/Caches/sjs-asset-export-session-tests.lock" \
+            swift package --disable-sandbox --allow-writing-to-package-directory \
+            benchmark baseline update change --no-progress
+
+      # `swift package` exits with 1 whenever `baseline check` finds a
+      # difference past a threshold, even when every one is an improvement, so
+      # the check's own verdict decides: it only says BETTER when nothing
+      # regressed.
+      - name: Compare
+        working-directory: change/Benchmarks
+        run: |
+          set -o pipefail
+          cp -R ../../base/Benchmarks/.benchmarkBaselines/ExportBenchmarks/base \
+            .benchmarkBaselines/ExportBenchmarks/
+          swift package benchmark baseline compare base change --no-progress
+          if swift package benchmark baseline check base change 2>&1 | tee check.log; then
+            exit 0
+          fi
+          grep -q "is BETTER than the 'base' baseline thresholds" check.log

@@ -66,6 +66,7 @@ let benchmarks: @Sendable () -> Void = {
           let landscape = media.bundled("hdr-hlg-4k60-landscape-spatial-audio.mov"),
           let sdrHEVC = media.bundled("sdr-hevc-1080p30-41s.mov"),
           let sdrH264 = media.bundled("sdr-h264-1080p60-mono-audio.mov"),
+          let longSDRH264 = media.bundled("sdr-h264-1080p60-mono-audio-113s.mov"),
           let livePhoto = media.bundled("live-photo-hevc-lpcm-audio.mov")
     else {
         FileHandle.standardError.write(Data("""
@@ -101,6 +102,11 @@ let benchmarks: @Sendable () -> Void = {
         "Bundle 1080p60 H.264 to 30 fps",
         source: sdrH264,
         video: .codec(.h264, width: 1920, height: 1080).fps(30)
+    )
+    exportBenchmark(
+        "Bundle 1080p60 H.264 113s to 720p30 H.264",
+        source: longSDRH264,
+        video: .codec(.h264, width: 1280, height: 720).fps(30)
     )
     exportBenchmark(
         "Bundle Live Photo with LPCM audio to H.264",

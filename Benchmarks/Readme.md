@@ -30,7 +30,7 @@ There are two sets of benchmarks:
 - **Fixture** benchmarks export the clips checked in with the tests, in
   `Tests/SJSAssetExportSessionTests/Resources`. They run on a fresh clone.
 - **Bundle** benchmarks export real iPhone clips that are too big to check in. `./fetch-media`
-  downloads them (about 275 MB) into `~/Library/Caches/SJSAssetExportSession/benchmark-media-v1`
+  downloads them (about 600 MB) into `~/Library/Caches/SJSAssetExportSession/benchmark-media-v1`
   and checks them against `media.sha256`. Without them the bundle benchmarks are skipped. Set
   `SJS_BENCHMARK_MEDIA_DIR` to keep them somewhere else.
 
@@ -40,6 +40,7 @@ There are two sets of benchmarks:
 | `hdr-hlg-4k60-landscape-spatial-audio.mov` | iPhone 4K60 HLG HEVC, landscape, with spatial audio, 11.3s |
 | `sdr-hevc-1080p30-41s.mov` | iPhone 1080p30 SDR HEVC, 40.9s |
 | `sdr-h264-1080p60-mono-audio.mov` | iPhone 1080p60 H.264 with mono audio, 26.5s |
+| `sdr-h264-1080p60-mono-audio-113s.mov` | iPhone 1080p60 H.264 with mono audio, 113s, for memory growth over a long export |
 | `live-photo-hevc-lpcm-audio.mov` | Live Photo video, HEVC with uncompressed audio, 2.8s |
 
 The clips are hosted as a [generic package on git.samhuri.net][media]. To change them, put the
@@ -83,8 +84,31 @@ swift package --disable-sandbox --allow-writing-to-package-directory benchmark b
 swift package benchmark baseline check main change
 ```
 
-The check exits with 2 when something regressed past the thresholds above. Baselines are saved in
+The check fails when something regressed past the thresholds above. It also fails when the change
+only improved things, and says so with "is BETTER than". Baselines are saved in
 `.benchmarkBaselines`, which is ignored.
+
+The Benchmarks workflow in `.forgejo/workflows/benchmarks.yml` does the same on the CI Mac. It
+runs on pushes to main that touch the library or the benchmarks, comparing with the previous
+commit, and can be run by hand on any branch to compare it with main or another ref. Both runs use
+the newer commit's benchmarks, so a base from before a benchmark existed is still measured with
+it.
+
+```mermaid
+sequenceDiagram
+    participant Job as Benchmarks job
+    participant Base as base checkout
+    participant Change as change checkout
+    Job->>Change: checkout@v1 (the pushed or chosen commit)
+    Job->>Base: checkout@v1 (previous commit or the base input)
+    Job->>Change: fetch-media
+    Job->>Base: replace Benchmarks with the change's
+    Job->>Base: benchmark baseline update base
+    Job->>Change: benchmark baseline update change
+    Base-->>Change: copy .benchmarkBaselines/ExportBenchmarks/base
+    Job->>Change: benchmark baseline compare base change
+    Job->>Change: benchmark baseline check base change
+```
 
 The exports can fail with AVFoundation error -11800 when two encode on the same Mac at once, so
 don't run the benchmarks alongside the tests.
