@@ -59,6 +59,36 @@ struct FrameScalerTests {
         #expect(samples(of: scaled, plane: 1).allSatisfy { isClose($0, to: Self.neutralChroma) })
     }
 
+    @Test(arguments: formats)
+    func test_falls_back_to_vImage_when_the_GPU_fails(format: OSType) throws {
+        let subject = FrameScaler(size: CGSize(width: 160, height: 90), mode: .stretch, gpu: RefusingScaler())
+
+        let scaled = try subject.scale(makeGreyFrame(format: format, size: CGSize(width: 640, height: 360)))
+
+        #expect(samples(of: scaled, plane: 0).allSatisfy { isClose($0, to: Self.lumaGrey) })
+        #expect(samples(of: scaled, plane: 1).allSatisfy { isClose($0, to: Self.neutralChroma) })
+        #expect(subject.cpuFallbackCount == 1)
+    }
+
+    @Test(.enabled(if: GPUScaler() != nil), arguments: formats)
+    func test_vImage_fallback_matches_the_GPU(format: OSType) throws {
+        let source = try makeStripedFrame(format: format, size: CGSize(width: 640, height: 360))
+        let size = CGSize(width: 250, height: 140)
+
+        let onGPU = try FrameScaler(size: size, mode: .stretch).scale(source)
+        let onCPU = try FrameScaler(size: size, mode: .stretch, gpu: nil).scale(source)
+
+        // On these edges the same Lanczos kernel lands within 3 levels on both, and vImage's
+        // high-quality kernel up to 6 levels away.
+        let tolerance = 4 << 8
+        for plane in [0, 1] {
+            let differences = zip(samples(of: onGPU, plane: plane), samples(of: onCPU, plane: plane))
+                .map { abs(Int($0) - Int($1)) }
+            let largest = try #require(differences.max())
+            #expect(largest <= tolerance, "plane \(plane) differs by up to \(Double(largest) / 256) 8-bit levels")
+        }
+    }
+
     private func isClose(_ sample: UInt16, to expected: UInt16) -> Bool {
         abs(Int(sample) - Int(expected)) <= 0x200
     }
@@ -91,6 +121,34 @@ struct FrameScalerTests {
         return frame
     }
 
+    /// Hard-edged stripes, dark and light in luma and in both chroma channels, where filters
+    /// with different kernels ring differently.
+    private func makeStripedFrame(format: OSType, size: CGSize) throws -> CVPixelBuffer {
+        let frame = try makeGreyFrame(format: format, size: size)
+        CVPixelBufferLockBaseAddress(frame, [])
+        defer { CVPixelBufferUnlockBaseAddress(frame, []) }
+
+        let isTenBit = format == kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange
+        for (plane, dark, light) in [(0, 40, 200), (1, 90, 170)] {
+            let base = try #require(CVPixelBufferGetBaseAddressOfPlane(frame, plane))
+            let rowBytes = CVPixelBufferGetBytesPerRowOfPlane(frame, plane)
+            let samplesPerRow = CVPixelBufferGetWidthOfPlane(frame, plane) * (plane == 0 ? 1 : 2)
+            let pixelsPerSample = plane == 0 ? 1 : 2
+            for row in 0 ..< CVPixelBufferGetHeightOfPlane(frame, plane) {
+                let start = base.advanced(by: row * rowBytes)
+                for index in 0 ..< samplesPerRow {
+                    let value = (index / pixelsPerSample / 7).isMultiple(of: 2) ? dark : light
+                    if isTenBit {
+                        start.storeBytes(of: UInt16(value << 8), toByteOffset: index * 2, as: UInt16.self)
+                    } else {
+                        start.storeBytes(of: UInt8(value), toByteOffset: index, as: UInt8.self)
+                    }
+                }
+            }
+        }
+        return frame
+    }
+
     /// Every sample in a plane, row by row and without padding, with 8-bit samples moved into the
     /// high bits so both formats compare the same way.
     private func samples(of frame: CVPixelBuffer, plane: Int) -> [UInt16] {
@@ -109,5 +167,14 @@ struct FrameScalerTests {
                     : UInt16(start.load(fromByteOffset: index, as: UInt8.self)) << 8
             }
         }
+    }
+}
+
+/// Fails every frame, the way the GPU refuses work from an iOS app in the background.
+private struct RefusingScaler: PlaneScaler {
+    struct Refused: Error {}
+
+    func scale(_ source: CVPixelBuffer, into destination: CVPixelBuffer, layout: ScaleLayout, isTenBit: Bool) throws {
+        throw Refused()
     }
 }
