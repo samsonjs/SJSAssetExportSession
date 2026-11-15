@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+#
+# Benchmarks the library in another checkout and in this one, both with this checkout's Benchmarks
+# package, and fails when this one regressed past the thresholds in ExportBenchmarks.swift. A
+# regression only counts when a second pair of runs shows it too, so a burst of load on the machine
+# during one run doesn't fail the comparison.
+#
+#   Benchmarks/compare BASE-CHECKOUT [benchmark options, such as --filter REGEX]
+#
+# The base checkout's Benchmarks directory is replaced. Exports take the same lock as the tests in
+# CI, because two exports encoding on one Mac at once fail with AVFoundation -11800.
+
+set -euo pipefail
+
+if [[ $# -lt 1 ]]; then
+    echo "usage: $0 BASE-CHECKOUT [benchmark options]" >&2
+    exit 64
+fi
+
+change=$(cd "$(dirname "$0")" && pwd)
+base_root=$(cd "$1" && pwd)
+shift
+base="$base_root/Benchmarks"
+lock="$HOME/Library/Caches/sjs-asset-export-session-tests.lock"
+log=$(mktemp "${TMPDIR:-/tmp}/benchmark-check.XXXXXX")
+trap 'rm -f "$log"' EXIT
+
+rm -rf "$base"
+rsync -a --exclude .build --exclude .benchmarkBaselines "$change/" "$base/"
+
+benchmark() {
+    local dir=$1 baseline=$2
+    shift 2
+    (cd "$dir" && lockf -k "$lock" swift package --disable-sandbox --allow-writing-to-package-directory \
+        benchmark baseline update "$baseline" --no-progress "$@")
+}
+
+# `swift package` exits with 1 whenever `baseline check` finds a difference past a threshold, even
+# when every one is an improvement, so the check's own verdict decides: it only says BETTER when
+# nothing regressed.
+passes() {
+    local round=$1
+    mkdir -p "$change/.benchmarkBaselines/ExportBenchmarks"
+    rm -rf "$change/.benchmarkBaselines/ExportBenchmarks/base-$round"
+    cp -R "$base/.benchmarkBaselines/ExportBenchmarks/base-$round" "$change/.benchmarkBaselines/ExportBenchmarks/"
+    (cd "$change" && swift package benchmark baseline compare "base-$round" "change-$round" --no-progress)
+    if (cd "$change" && swift package benchmark baseline check "base-$round" "change-$round") 2>&1 | tee "$log"; then
+        return 0
+    fi
+    grep -q "is BETTER than the 'base-$round' baseline thresholds" "$log"
+}
+
+for round in 1 2; do
+    benchmark "$base" "base-$round" "$@"
+    benchmark "$change" "change-$round" "$@"
+    if passes "$round"; then
+        echo "No regressions in round $round."
+        exit 0
+    fi
+    echo "Round $round found a regression."
+done
+
+echo "Both rounds found a regression."
+exit 1

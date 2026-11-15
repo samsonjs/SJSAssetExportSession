@@ -6,15 +6,17 @@ import SJSAssetExportSession
 
 let benchmarks: @Sendable () -> Void = {
     Benchmark.defaultConfiguration = .init(
-        metrics: [.cpuTotal, .peakMemoryResident, .wallClock],
+        metrics: [.instructions, .peakMemoryResident, .wallClock, .cpuTotal],
         warmupIterations: 1,
         maxDuration: .seconds(60),
         maxIterations: 5,
         thresholds: [
-            .cpuTotal: .init(relative: [.p50: 10]),
-            .peakMemoryResident: .init(relative: [.p50: 15]),
-            // Reported but never failed on: the hardware encoder makes it the noisiest number.
+            .instructions: .init(relative: [.p50: 20]),
+            .peakMemoryResident: .init(relative: [.p50: 25]),
+            // Reported but never failed on: on a busy machine both moved by more than 50% between
+            // two runs of the same code.
             .wallClock: .init(),
+            .cpuTotal: .init(),
         ]
     )
 

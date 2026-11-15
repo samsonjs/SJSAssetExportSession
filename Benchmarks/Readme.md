@@ -59,9 +59,15 @@ curl --fail --user sjs:<token> --upload-file <clip> \
 
 | Metric | Fails a comparison when the median is |
 | --- | --- |
-| CPU time | more than 10% higher |
-| Peak resident memory | more than 15% higher |
+| Instructions | more than 20% higher |
+| Peak resident memory | more than 25% higher |
 | Wall-clock time | never, it's only reported |
+| CPU time | never, it's only reported |
+
+Instructions are the process's retired instruction count, from `rusage`. Timings depend on what
+else the machine is doing and instruction counts mostly don't: on a busy machine, two runs of the
+same code differed by more than 50% in both CPU time and wall-clock time, while instructions
+stayed within 11% and peak memory within 17%.
 
 After each export a benchmark checks that the output's duration and frame count match the source,
 or the requested frame rate, within 2%. An export can't get faster by dropping frames.
@@ -75,40 +81,42 @@ that crashes AudioToolbox's offline mixer, which the library uses to mix audio, 
 
 ## Comparing a change
 
-Save a baseline before the change and one after, then check one against the other:
+Check out the base to compare with in another directory, then run `compare` from the change:
 
 ```bash
-swift package --disable-sandbox --allow-writing-to-package-directory benchmark baseline update main
-# Switch to the change.
-swift package --disable-sandbox --allow-writing-to-package-directory benchmark baseline update change
-swift package benchmark baseline check main change
+git worktree add ../base main
+Benchmarks/compare ../base
 ```
 
-The check fails when something regressed past the thresholds above. It also fails when the change
-only improved things, and says so with "is BETTER than". Baselines are saved in
-`.benchmarkBaselines`, which is ignored.
+It replaces the base's `Benchmarks` directory with this one, so both are measured with the same
+benchmarks, and benchmarks the base and then the change. When the change regressed past the
+thresholds above, it benchmarks both again and fails only if the second pair regressed too, so a
+burst of load during one run doesn't fail the comparison. Options after the base are passed to
+the benchmarks, such as `--filter 'Fixture.*'`. Baselines are saved in `.benchmarkBaselines`,
+which is ignored.
 
-The Benchmarks workflow in `.forgejo/workflows/benchmarks.yml` does the same on the CI Mac. It
-runs on pushes to main that touch the library or the benchmarks, comparing with the previous
-commit, and can be run by hand on any branch to compare it with main or another ref. Both runs use
-the newer commit's benchmarks, so a base from before a benchmark existed is still measured with
-it.
+The Benchmarks workflow in `.forgejo/workflows/benchmarks.yml` runs `compare` on a CI Mac. It runs
+on pushes to main that touch the library or the benchmarks, comparing with the previous commit,
+and can be run by hand on any branch to compare it with main or another ref.
 
 ```mermaid
 sequenceDiagram
     participant Job as Benchmarks job
+    participant Compare as Benchmarks/compare
     participant Base as base checkout
     participant Change as change checkout
     Job->>Change: checkout@v1 (the pushed or chosen commit)
     Job->>Base: checkout@v1 (previous commit or the base input)
     Job->>Change: fetch-media
-    Job->>Base: replace Benchmarks with the change's
-    Job->>Base: benchmark baseline update base
-    Job->>Change: benchmark baseline update change
-    Base-->>Change: copy .benchmarkBaselines/ExportBenchmarks/base
-    Job->>Change: benchmark baseline compare base change
-    Job->>Change: benchmark baseline check base change
+    Job->>Compare: compare base
+    Compare->>Base: replace Benchmarks with the change's
+    loop Round 1, then round 2 only if round 1 regressed
+        Compare->>Base: benchmark baseline update base-N
+        Compare->>Change: benchmark baseline update change-N
+        Compare->>Change: benchmark baseline check base-N change-N
+    end
 ```
 
-The exports can fail with AVFoundation error -11800 when two encode on the same Mac at once, so
-don't run the benchmarks alongside the tests.
+`compare` takes the same lock as the tests in CI, because exports fail with AVFoundation error
+-11800 when two encode on the same Mac at once. Running `swift package benchmark` yourself doesn't,
+so don't run it alongside the tests.
