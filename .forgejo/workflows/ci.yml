@@ -1,6 +1,8 @@
 # SwiftPM CI on thetis (macOS host mode), on the Xcode pinned in .xcode-version
-# and on the other Xcode 27 releases thetis has. The package targets macOS as
-# well as iOS, so `swift test` runs straight on the host with no simulator.
+# and on the other Xcode 27 releases thetis has, then on iOS 26 and 27
+# simulators. `swift test` covers the macOS side on the host. The iOS job is
+# there because AVFoundation's audio encoder is stricter on iOS: mismatched
+# audio formats that macOS converts silently fail there, and only there.
 #
 # Forgejo is the primary repo and pushes to GitHub, which ignores .forgejo/.
 #
@@ -101,3 +103,56 @@ jobs:
         with:
           fail-on-warnings: "true"
           serialize: "true"
+
+  # One build, then the tests on each simulator in turn. After the macOS tests
+  # rather than beside them: two host runs encoding at once fail with -11800,
+  # and whether a simulator run collides with a host run hasn't been tried. On
+  # any outcome but a cancel, so a macOS failure doesn't hide the iOS result.
+  ios:
+    name: Tests (iOS)
+    needs: test
+    if: ${{ !cancelled() }}
+    # thetis's simulator runner, which takes one job at a time across every
+    # repo.
+    runs-on: ios-simulator
+    timeout-minutes: 30
+    steps:
+      - name: Check out
+        uses: https://git.samhuri.net/sjs/actions/checkout@v1
+        with:
+          require-file: Package.swift
+
+      - name: Select Xcode
+        uses: https://git.samhuri.net/sjs/actions/xcode@v1
+
+      - name: Show toolchain
+        uses: https://git.samhuri.net/sjs/actions/xcode-toolchain@v1
+        with:
+          tools: xcsift
+          simulators: true
+
+      - name: Check toolchain pins
+        uses: https://git.samhuri.net/sjs/actions/check-toolchain@v1
+
+      - name: Pick the iOS 26 simulator
+        id: ios26
+        uses: https://git.samhuri.net/sjs/actions/simulator@v1
+        with:
+          ios-version: "26"
+
+      - name: Pick the iOS 27 simulator
+        id: ios27
+        uses: https://git.samhuri.net/sjs/actions/simulator@v1
+        with:
+          ios-version: "27"
+
+      # No project or workspace: the action builds the package itself.
+      - name: Run tests
+        uses: https://git.samhuri.net/sjs/actions/xcodebuild@v1
+        with:
+          action: test
+          scheme: SJSAssetExportSession
+          destination: |
+            ${{ steps.ios26.outputs.destination }}
+            ${{ steps.ios27.outputs.destination }}
+          fail-on-warnings: "true"
