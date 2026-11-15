@@ -3,20 +3,13 @@
 # regressed past the thresholds set in Benchmarks/Benchmarks/ExportBenchmarks.
 # Benchmarks/compare does the work; see it for how a busy machine is handled.
 #
-# It runs on pushes to main and by hand, comparing a branch with main or any
-# other ref, rather than on every pull request.
+# It only runs by hand, comparing a branch with main or any other ref. Only
+# instruction counts and peak memory can fail it; for timings, run
+# Benchmarks/compare on a quiet machine.
 
 name: Benchmarks
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "Sources/**"
-      - "Package.swift"
-      - "Benchmarks/**"
-      - ".xcode-version"
-      - ".forgejo/workflows/benchmarks.yml"
   workflow_dispatch:
     inputs:
       base:
@@ -43,7 +36,7 @@ jobs:
         uses: https://git.samhuri.net/sjs/actions/checkout@v1
         with:
           path: base
-          ref: ${{ github.event_name == 'push' && github.event.before || inputs.base }}
+          ref: ${{ inputs.base }}
           require-file: Package.swift
 
       - name: Select Xcode

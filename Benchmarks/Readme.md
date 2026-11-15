@@ -95,9 +95,10 @@ burst of load during one run doesn't fail the comparison. Options after the base
 the benchmarks, such as `--filter 'Fixture.*'`. Baselines are saved in `.benchmarkBaselines`,
 which is ignored.
 
-The Benchmarks workflow in `.forgejo/workflows/benchmarks.yml` runs `compare` on a CI Mac. It runs
-on pushes to main that touch the library or the benchmarks, comparing with the previous commit,
-and can be run by hand on any branch to compare it with main or another ref.
+The Benchmarks workflow in `.forgejo/workflows/benchmarks.yml` runs `compare` on a CI Mac. It only
+runs by hand: start it on a branch to compare it with main or another ref. The runners are often
+busy, so read its timings with that in mind. Only instruction counts and peak memory fail it. To
+compare timings, run `compare` yourself on a quiet machine.
 
 ```mermaid
 sequenceDiagram
@@ -105,8 +106,8 @@ sequenceDiagram
     participant Compare as Benchmarks/compare
     participant Base as base checkout
     participant Change as change checkout
-    Job->>Change: checkout@v1 (the pushed or chosen commit)
-    Job->>Base: checkout@v1 (previous commit or the base input)
+    Job->>Change: checkout@v1 (the branch it was started on)
+    Job->>Base: checkout@v1 (the base input, main by default)
     Job->>Change: fetch-media
     Job->>Compare: compare base
     Compare->>Base: replace Benchmarks with the change's
