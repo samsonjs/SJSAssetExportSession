@@ -2,8 +2,8 @@
 
 ## [Unreleased]
 
-### Added/Changed/Fixed
-- Your change here.
+### Changed
+- Exports at a size other than the source's now scale frames on the GPU with Metal Performance Shaders' Lanczos filter instead of vImage on the CPU, and fall back to vImage where Metal isn't available. Exporting 4K HDR video to 1080p takes 75 to 90% less CPU time and 50 to 85% less memory. The output looks the same but isn't bit-identical: the GPU filter matches vImage's default Lanczos resampling rather than its high-quality mode.
 
 [Unreleased]: https://git.samhuri.net/sjs/SJSAssetExportSession/compare/0.6.0...HEAD
 

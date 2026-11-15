@@ -49,14 +49,29 @@ struct FrameScalerTests {
         #expect(samples(of: scaled, plane: 1).prefix(180).allSatisfy { $0 == Self.neutralChroma })
     }
 
+    @Test(arguments: formats, [VideoOutputSettings.ScaleMode.stretch, .fill])
+    func test_edges_keep_their_brightness(format: OSType, mode: VideoOutputSettings.ScaleMode) throws {
+        let subject = FrameScaler(size: CGSize(width: 161, height: 91), mode: mode)
+
+        let scaled = try subject.scale(makeGreyFrame(format: format, size: CGSize(width: 640, height: 360)))
+
+        #expect(samples(of: scaled, plane: 0).allSatisfy { isClose($0, to: Self.lumaGrey) })
+        #expect(samples(of: scaled, plane: 1).allSatisfy { isClose($0, to: Self.neutralChroma) })
+    }
+
     private func isClose(_ sample: UInt16, to expected: UInt16) -> Bool {
         abs(Int(sample) - Int(expected)) <= 0x200
     }
 
     /// Solid grey with neutral chroma, so anything else in the scaled frame came from the scaler.
+    /// IOSurface-backed and Metal-compatible like the reader's frames.
     private func makeGreyFrame(format: OSType, size: CGSize) throws -> CVPixelBuffer {
+        let attributes: [String: Any] = [
+            kCVPixelBufferIOSurfacePropertiesKey as String: [String: Any](),
+            kCVPixelBufferMetalCompatibilityKey as String: true,
+        ]
         var pixelBuffer: CVPixelBuffer?
-        CVPixelBufferCreate(nil, Int(size.width), Int(size.height), format, nil, &pixelBuffer)
+        CVPixelBufferCreate(nil, Int(size.width), Int(size.height), format, attributes as CFDictionary, &pixelBuffer)
         let frame = try #require(pixelBuffer)
         CVPixelBufferLockBaseAddress(frame, [])
         defer { CVPixelBufferUnlockBaseAddress(frame, []) }
