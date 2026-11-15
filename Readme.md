@@ -254,6 +254,10 @@ try await exporter.export(
 
 The pixel buffer is bi-planar YCbCr: 10-bit for HLG and PQ compositions and 8-bit otherwise, IOSurface-backed and Metal-compatible. `drawFrame` is called once per frame, one call at a time, and the frame is encoded as soon as it returns, so finish any GPU work first. Drawing a full frame with Core Image is slow at 4K, so for small overlays it's worth drawing just those pixels, for example with Metal. An error thrown from `drawFrame` stops the export and is rethrown from `export`.
 
+## Benchmarks
+
+The package in [Benchmarks](Benchmarks) measures how much CPU time and memory exports take, on the test fixtures and on a bundle of real iPhone clips. See [Benchmarks/Readme.md](Benchmarks/Readme.md) for running them and comparing a change.
+
 ## License
 
 Copyright © 2024-2025 [Sami Samhuri](https://samhuri.net) <sami@samhuri.net>. Released under the terms of the [MIT License][MIT].

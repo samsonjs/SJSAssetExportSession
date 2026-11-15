@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+#
+# Downloads the benchmark media listed in media.sha256 and checks every file against its hash.
+# Files that are already there and intact aren't downloaded again.
+#
+#   SJS_BENCHMARK_MEDIA_DIR  where to put the clips (default: the cache directory the benchmarks read)
+#   SJS_BENCHMARK_MEDIA_URL  where to download them from (default: the package on git.samhuri.net)
+
+set -euo pipefail
+
+# Keep in sync with BenchmarkMedia.bundleVersion.
+version=v1
+
+here=$(cd "$(dirname "$0")" && pwd)
+manifest="$here/media.sha256"
+base_url=${SJS_BENCHMARK_MEDIA_URL:-https://git.samhuri.net/api/packages/sjs/generic/sjs-asset-export-session-benchmark-media/$version}
+dest=${SJS_BENCHMARK_MEDIA_DIR:-$HOME/Library/Caches/SJSAssetExportSession/benchmark-media-$version}
+
+mkdir -p "$dest"
+cd "$dest"
+
+while read -r sum name; do
+    if [[ -f $name ]] && echo "$sum  $name" | shasum -a 256 --check --status; then
+        continue
+    fi
+    echo "Downloading $name"
+    curl --fail --location --silent --show-error --output "$name.partial" "$base_url/$name"
+    mv "$name.partial" "$name"
+done < "$manifest"
+
+shasum -a 256 --check "$manifest"
+echo "Benchmark media is ready in $dest"
