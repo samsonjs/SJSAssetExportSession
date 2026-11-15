@@ -476,6 +476,7 @@ final class ExportSessionTests: BaseTests {
         let audioFormat = try #require(await audioTrack.load(.formatDescriptions).first)
         #expect(audioFormat.mediaSubType == .mpeg4AAC)
         #expect(audioFormat.audioStreamBasicDescription?.mChannelsPerFrame == 2)
+        #expect(audioFormat.audioStreamBasicDescription?.mSampleRate == 48_000)
     }
 
     @Test func test_keeps_surround_audio_when_the_output_asks_for_it() async throws {
@@ -517,6 +518,81 @@ final class ExportSessionTests: BaseTests {
         let audioTrack = try #require(await exportedAsset.loadTracks(withMediaType: .audio).first)
         let audioFormat = try #require(await audioTrack.load(.formatDescriptions).first)
         #expect(audioFormat.audioStreamBasicDescription?.mChannelsPerFrame == 1)
+    }
+
+    @Test func test_format_without_a_sample_rate_matches_the_source() async throws {
+        let sourceURL = resourceURL(named: "test-5.1-audio.mp4")
+        let destinationURL = makeTemporaryURL()
+
+        let subject = ExportSession()
+        try await subject.export(
+            asset: makeAsset(url: sourceURL),
+            audio: .format(.aac),
+            video: .codec(.h264, size: CGSize(width: 64, height: 64)),
+            to: destinationURL.url,
+            as: .mp4
+        )
+
+        let exportedAsset = AVURLAsset(url: destinationURL.url)
+        let audioTrack = try #require(await exportedAsset.loadTracks(withMediaType: .audio).first)
+        let audioFormat = try #require(await audioTrack.load(.formatDescriptions).first)
+        #expect(audioFormat.audioStreamBasicDescription?.mSampleRate == 48_000)
+    }
+
+    @Test func test_raw_audio_settings_without_a_sample_rate_match_the_source() async throws {
+        let sourceURL = resourceURL(named: "test-5.1-audio.mp4")
+        let destinationURL = makeTemporaryURL()
+
+        let subject = ExportSession()
+        try await subject.export(
+            asset: makeAsset(url: sourceURL),
+            audioOutputSettings: [
+                AVFormatIDKey: kAudioFormatMPEG4AAC,
+                AVNumberOfChannelsKey: NSNumber(value: 2),
+            ],
+            videoOutputSettings: VideoOutputSettings
+                .codec(.h264, size: CGSize(width: 64, height: 64)).settingsDictionary,
+            to: destinationURL.url,
+            as: .mp4
+        )
+
+        let exportedAsset = AVURLAsset(url: destinationURL.url)
+        let audioTrack = try #require(await exportedAsset.loadTracks(withMediaType: .audio).first)
+        let audioFormat = try #require(await audioTrack.load(.formatDescriptions).first)
+        #expect(audioFormat.audioStreamBasicDescription?.mSampleRate == 48_000)
+    }
+
+    @Test func test_mixed_source_sample_rates_export_at_44_1_khz() async throws {
+        let videoSource = AVURLAsset(url: resourceURL(named: "test-720p-h264-24fps.mov"))
+        let surroundSource = AVURLAsset(url: resourceURL(named: "test-5.1-audio.mp4"))
+        let timeRange = CMTimeRange(start: .zero, duration: .seconds(1))
+        let composition = AVMutableComposition()
+        let sourceTracks = try await [
+            #require(videoSource.loadTracks(withMediaType: .video).first),
+            #require(videoSource.loadTracks(withMediaType: .audio).first), // 44.1 kHz
+            #require(surroundSource.loadTracks(withMediaType: .audio).first), // 48 kHz
+        ]
+        for sourceTrack in sourceTracks {
+            let track = try #require(composition.addMutableTrack(
+                withMediaType: sourceTrack.mediaType,
+                preferredTrackID: kCMPersistentTrackID_Invalid
+            ))
+            try track.insertTimeRange(timeRange, of: sourceTrack, at: .zero)
+        }
+        let destinationURL = makeTemporaryURL()
+
+        let subject = ExportSession()
+        try await subject.export(
+            asset: composition,
+            video: .codec(.h264, width: 160, height: 90),
+            to: destinationURL.url,
+            as: .mp4
+        )
+
+        let exportedAsset = AVURLAsset(url: destinationURL.url)
+        let audioTrack = try #require(await exportedAsset.loadTracks(withMediaType: .audio).first)
+        let audioFormat = try #require(await audioTrack.load(.formatDescriptions).first)
+        #expect(audioFormat.audioStreamBasicDescription?.mSampleRate == 44_100)
     }
 
     @Test func test_export_throws_for_surround_settings_without_a_layout() async throws {

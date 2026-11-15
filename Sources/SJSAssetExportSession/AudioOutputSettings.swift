@@ -30,12 +30,12 @@ public struct AudioOutputSettings: Hashable, Sendable, Codable {
     public let channels: Int
     public let sampleRate: Int?
 
-    /// Specifies the AAC format with 2 channels at a 44.1 KHz sample rate.
+    /// Specifies the AAC format with 2 channels at the source's sample rate.
     public static var `default`: AudioOutputSettings {
-        .format(.aac).channels(2).sampleRate(44_100)
+        .format(.aac).channels(2)
     }
 
-    /// Specifies the given format with 2 channels.
+    /// Specifies the given format with 2 channels at the source's sample rate.
     public static func format(_ format: Format) -> AudioOutputSettings {
         .init(format: format.formatID, channels: 2, sampleRate: nil)
     }
@@ -44,6 +44,9 @@ public struct AudioOutputSettings: Hashable, Sendable, Codable {
         .init(format: format, channels: channels, sampleRate: sampleRate)
     }
 
+    /// Sets the sample rate in Hz. With `nil`, the default, the export uses the sample rate of the
+    /// source's audio tracks, or 44.1 kHz when they have different rates, lowered to the nearest
+    /// rate the format can encode when it can't encode that one.
     public func sampleRate(_ sampleRate: Int?) -> AudioOutputSettings {
         .init(format: format, channels: channels, sampleRate: sampleRate)
     }

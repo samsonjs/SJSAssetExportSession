@@ -81,7 +81,6 @@ actor SampleWriter {
         writer.metadata = metadata
         self.writer = writer
 
-        self.audioOutputSettings = audioOutputSettings
         self.audioMix = audioMix
         self.videoOutputSettings = videoOutputSettings
         self.videoComposition = videoComposition
@@ -96,6 +95,8 @@ actor SampleWriter {
         // preserve track groups and make that all configurable.
         let audioTracks = try await asset.loadTracks(withMediaType: .audio)
             .filterAsync { try await $0.load(.isEnabled) }
+        let audioOutputSettings = try await Self.withSourceSampleRate(audioOutputSettings, from: audioTracks)
+        self.audioOutputSettings = audioOutputSettings
         // Audio is optional so only validate output settings when it's applicable.
         if !audioTracks.isEmpty {
             try Self.validateAudio(outputSettings: audioOutputSettings, writer: writer)
@@ -366,6 +367,65 @@ actor SampleWriter {
         ]
     }
 
+    // MARK: Audio sample rate
+
+    /// Fills in a missing sample rate with the source's. See ``sampleRate(encoding:from:)``.
+    private static func withSourceSampleRate(
+        _ outputSettings: [String: any Sendable],
+        from tracks: [AVAssetTrack]
+    ) async throws -> [String: any Sendable] {
+        guard !outputSettings.isEmpty,
+              outputSettings[AVSampleRateKey] == nil,
+              let formatID = (outputSettings[AVFormatIDKey] as? NSNumber)?.uint32Value
+        else { return outputSettings }
+
+        var sourceRates: [Float64] = []
+        for track in tracks {
+            for format in try await track.load(.formatDescriptions) {
+                if let rate = format.audioStreamBasicDescription?.mSampleRate, rate > 0 {
+                    sourceRates.append(rate)
+                }
+            }
+        }
+        guard let rate = sampleRate(encoding: formatID, from: sourceRates) else { return outputSettings }
+
+        var settings = outputSettings
+        settings[AVSampleRateKey] = NSNumber(value: rate)
+        return settings
+    }
+
+    /// The rate the source tracks share, or 44.1 kHz when they differ, lowered to the nearest rate
+    /// the format can encode when it can't encode that one, e.g. 48 kHz for a 96 kHz source going
+    /// to AAC.
+    ///
+    /// Mixing a 44.1 kHz track with a 48 kHz one at 48 kHz can silence the 44.1 kHz track partway
+    /// through when an audio mix ramps its volume. `AudioMixTests` reproduces it. At 44.1 kHz the
+    /// track stays audible.
+    static func sampleRate(encoding formatID: AudioFormatID, from sourceRates: [Float64]) -> Float64? {
+        guard let firstRate = sourceRates.first else { return nil }
+        let sourceRate = sourceRates.allSatisfy { $0 == firstRate } ? firstRate : 44_100
+        let encodableRates = encodableSampleRates(formatID)
+        guard !encodableRates.isEmpty else { return sourceRate }
+        let ratesAtOrBelowSource = encodableRates.compactMap { range -> Float64? in
+            range.mMinimum <= sourceRate ? min(range.mMaximum, sourceRate) : nil
+        }
+        return ratesAtOrBelowSource.max() ?? encodableRates.map(\.mMinimum).min()
+    }
+
+    private static func encodableSampleRates(_ formatID: AudioFormatID) -> [AudioValueRange] {
+        var formatID = formatID
+        let specifierSize = UInt32(MemoryLayout<AudioFormatID>.size)
+        let property = kAudioFormatProperty_AvailableEncodeSampleRates
+        var size: UInt32 = 0
+        guard AudioFormatGetPropertyInfo(property, specifierSize, &formatID, &size) == noErr else { return [] }
+        var ranges = [AudioValueRange](
+            repeating: AudioValueRange(),
+            count: Int(size) / MemoryLayout<AudioValueRange>.size
+        )
+        guard AudioFormatGetProperty(property, specifierSize, &formatID, &size, &ranges) == noErr else { return [] }
+        return ranges
+    }
+
     // MARK: Input validation
 
     private static func validateAudio(
@@ -377,6 +437,9 @@ actor SampleWriter {
             throw Error.setupFailure(.audioSettingsInvalid)
         }
         // canApply passes these, but creating the writer input then raises an exception.
+        guard outputSettings[AVSampleRateKey] != nil else {
+            throw Error.setupFailure(.audioSettingsInvalid)
+        }
         let channels = (outputSettings[AVNumberOfChannelsKey] as? NSNumber)?.intValue ?? 0
         if channels > 2, outputSettings[AVChannelLayoutKey] == nil {
             throw Error.setupFailure(.audioSettingsInvalid)

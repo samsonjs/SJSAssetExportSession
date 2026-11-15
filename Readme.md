@@ -68,7 +68,7 @@ try await exporter.export(
 )
 ```
 
-Most of the audio and video configuration is optional which is why there are no audio settings specified here. By default you get AAC with 2 channels at a 44.1 KHz sample rate.
+Most of the audio and video configuration is optional which is why there are no audio settings specified here. By default you get AAC with 2 channels at the source's sample rate.
 
 ### All Nice Parameters
 

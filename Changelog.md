@@ -4,6 +4,10 @@
 
 ### Changed
 - Exports at a size other than the source's now scale frames on the GPU with Metal Performance Shaders' Lanczos filter instead of vImage on the CPU, and fall back to vImage where Metal isn't available or for any frame the GPU fails to scale, as it does while an iOS app is in the background. A fallback logs a warning the first time, and the export logs how many frames fell back when it finishes. Exporting 4K HDR video to 1080p takes 75 to 90% less CPU time and 50 to 85% less memory. The output looks the same but isn't bit-identical: both paths now use vImage's default Lanczos resampling kernel rather than its high-quality mode.
+- Audio is exported at the source's sample rate by default instead of 44.1 kHz. `AudioOutputSettings.default`, `AudioOutputSettings.format(_:)` and raw audio settings without `AVSampleRateKey` use the sample rate of the source's audio tracks, lowered to the nearest rate the format can encode when it can't encode that one, e.g. 48 kHz for a 96 kHz source going to AAC. Sources whose audio tracks have different sample rates still export at 44.1 kHz. Use `.sampleRate(_:)` or `AVSampleRateKey` for a fixed rate.
+
+### Fixed
+- Fixed exports crashing when the audio settings have no sample rate, such as `audio: .format(.aac)` without `.sampleRate(_:)` or raw audio settings without `AVSampleRateKey`. They now use the source's sample rate.
 
 [Unreleased]: https://git.samhuri.net/sjs/SJSAssetExportSession/compare/0.6.0...HEAD
 

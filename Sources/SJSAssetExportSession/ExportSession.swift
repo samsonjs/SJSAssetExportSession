@@ -95,6 +95,8 @@ public final class ExportSession: Sendable {
          - `AVFormatIDKey` with the typical value `kAudioFormatMPEG4AAC`
          - `AVNumberOfChannelsKey` with the typical value `NSNumber(value: 2)` or `AVChannelLayoutKey` with an instance of `AVAudioChannelLayout` for use with more than 2 channels.
 
+         Without `AVSampleRateKey` the export uses the sample rate of the source's audio tracks, or 44.1 kHz when they have different rates, lowered to the nearest rate the format can encode when it can't encode that one.
+
        - mix: An optional mix that can be used to manipulate the audio in some way.
 
        - videoOutputSettings: Video settings using [video settings keys from AVFoundation](https://developer.apple.com/documentation/avfoundation/video_settings) and values must be suitable for consumption by Objective-C. Required keys are:

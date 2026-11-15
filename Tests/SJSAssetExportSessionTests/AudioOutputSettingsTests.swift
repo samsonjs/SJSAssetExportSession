@@ -16,6 +16,11 @@ struct AudioOutputSettingsTests {
         return data.withUnsafeBytes { $0.load(as: AudioChannelLayout.self).mChannelLayoutTag }
     }
 
+    @Test func test_default_and_format_leave_the_sample_rate_to_the_source() {
+        #expect(AudioOutputSettings.default.settingsDictionary[AVSampleRateKey] == nil)
+        #expect(AudioOutputSettings.format(.aac).settingsDictionary[AVSampleRateKey] == nil)
+    }
+
     @Test func test_stereo_and_mono_leave_the_layout_out() {
         #expect(AudioOutputSettings.default.settingsDictionary[AVChannelLayoutKey] == nil)
         #expect(AudioOutputSettings.format(.aac).channels(1).settingsDictionary[AVChannelLayoutKey] == nil)
