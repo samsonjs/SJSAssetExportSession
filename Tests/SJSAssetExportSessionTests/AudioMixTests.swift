@@ -138,7 +138,8 @@ final class AudioMixTests: BaseTests {
         let asset = AVURLAsset(url: url)
         let track = try #require(await asset.loadTracks(withMediaType: .audio).first)
         let reader = try AVAssetReader(asset: asset)
-        let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
+        // Handed off to the read below and not touched here again.
+        nonisolated(unsafe) let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
             AVFormatIDKey: kAudioFormatLinearPCM,
             AVSampleRateKey: 44_100,
             AVNumberOfChannelsKey: 1,
@@ -149,15 +150,17 @@ final class AudioMixTests: BaseTests {
         ])
         reader.add(output)
         reader.startReading()
-        var samples: [Float] = []
-        while let sampleBuffer = output.copyNextSampleBuffer(), let blockBuffer = sampleBuffer.dataBuffer {
-            var chunk = [Float](repeating: 0, count: CMBlockBufferGetDataLength(blockBuffer) / MemoryLayout<Float>.size)
-            _ = chunk.withUnsafeMutableBytes { bytes in
-                CMBlockBufferCopyDataBytes(blockBuffer, atOffset: 0, dataLength: bytes.count, destination: bytes.baseAddress!)
+        return try await readBlocking {
+            var samples: [Float] = []
+            while let sampleBuffer = output.copyNextSampleBuffer(), let blockBuffer = sampleBuffer.dataBuffer {
+                var chunk = [Float](repeating: 0, count: CMBlockBufferGetDataLength(blockBuffer) / MemoryLayout<Float>.size)
+                _ = chunk.withUnsafeMutableBytes { bytes in
+                    CMBlockBufferCopyDataBytes(blockBuffer, atOffset: 0, dataLength: bytes.count, destination: bytes.baseAddress!)
+                }
+                samples += chunk
             }
-            samples += chunk
+            return samples
         }
-        return samples
     }
 
     /// Amplitude of a single frequency within a window of 44.1 kHz mono samples.

@@ -342,18 +342,4 @@ final class DrawFrameTests: BaseTests {
         }
         return (composition, videoComposition)
     }
-
-    private func countFrames(of url: URL) async throws -> Int {
-        let asset = AVURLAsset(url: url)
-        let track = try #require(try await asset.loadTracks(withMediaType: .video).first)
-        let reader = try AVAssetReader(asset: asset)
-        let output = AVAssetReaderTrackOutput(track: track, outputSettings: nil)
-        reader.add(output)
-        reader.startReading()
-        var count = 0
-        while let sample = output.copyNextSampleBuffer() {
-            count += CMSampleBufferGetNumSamples(sample)
-        }
-        return count
-    }
 }
