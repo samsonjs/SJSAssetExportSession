@@ -424,7 +424,55 @@ final class ExportSessionTests: BaseTests {
         }
     }
 
+    @Test func test_cancelling_an_export_stuck_on_a_frame() async throws {
+        let sourceURL = resourceURL(named: "test-720p-h264-24fps.mov")
+        let destinationURL💥 = makeTemporaryURL()
+        // The first frame never comes back while the export is waited on, the way a read that
+        // never returns wouldn't.
+        let (firstFrameStarted, firstFrameContinuation) = AsyncStream<Void>.makeStream()
+        let exportEnded = DispatchSemaphore(value: 0)
+        defer { exportEnded.signal() }
+        let subject = ExportSession(stallTimeout: nil)
+        let task = Task {
+            try await subject.export(
+                asset: AVURLAsset(url: sourceURL),
+                video: .codec(.h264, width: 1280, height: 720),
+                drawFrame: { _ in
+                    firstFrameContinuation.yield()
+                    exportEnded.wait()
+                },
+                to: destinationURL💥.url,
+                as: .mov
+            )
+        }
+        for await _ in firstFrameStarted {
+            break
+        }
+        task.cancel()
+        await #expect(throws: CancellationError.self) {
+            try await task.value
+        }
+    }
+
+    @Test func test_export_that_stops_making_progress_throws_stalled() async throws {
+        let sourceURL = resourceURL(named: "test-720p-h264-24fps.mov")
+        let destinationURL💥 = makeTemporaryURL()
+        let exportEnded = DispatchSemaphore(value: 0)
+        defer { exportEnded.signal() }
+        let subject = ExportSession(stallTimeout: .milliseconds(300))
+        await #expect(throws: ExportSession.Error.stalled) {
+            try await subject.export(
+                asset: AVURLAsset(url: sourceURL),
+                video: .codec(.h264, width: 1280, height: 720),
+                drawFrame: { _ in exportEnded.wait() },
+                to: destinationURL💥.url,
+                as: .mov
+            )
+        }
+    }
+
     @Test func test_writing_metadata() async throws {
+
         let sourceURL = resourceURL(named: "test-720p-h264-24fps.mov")
         let destinationURL = makeTemporaryURL()
         let locationMetadata = AVMutableMetadataItem()

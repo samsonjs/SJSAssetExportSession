@@ -38,6 +38,7 @@ actor SampleWriter {
     private let videoOutputSettings: [String: any Sendable]
     private let videoComposition: AVVideoComposition?
     private let timeRange: CMTimeRange
+    private let stallTimeout: Duration?
 
     // MARK: Internal state
 
@@ -52,6 +53,28 @@ actor SampleWriter {
     private var isAudioFinished = true
     private var isVideoFinished = false
 
+    /// How the export is going, kept outside the actor so ``writeSamples()`` can watch it while
+    /// the actor's queue is busy, or stuck in a read that never returns.
+    private let pace = OSAllocatedUnfairLock(initialState: Pace())
+
+    private struct Pace: Sendable {
+        var lastSample = SuspendingClock.now
+        var areInputsFinished = false
+        var isAbandoned = false
+    }
+
+    /// The reader and writer, for their `status` alone, which is thread safe on both.
+    private final class Statuses: @unchecked Sendable {
+        weak var reader: AVAssetReader?
+        weak var writer: AVAssetWriter?
+
+        var isUnderWay: Bool {
+            (reader?.status == .reading || reader?.status == .completed) && writer?.status == .writing
+        }
+    }
+
+    private let statuses = Statuses()
+
     nonisolated init(
         asset: sending AVAsset,
         audioOutputSettings: sending [String: any Sendable],
@@ -63,10 +86,13 @@ actor SampleWriter {
         optimizeForNetworkUse: Bool = false,
         metadata: [AVMetadataItem] = [],
         drawFrame: sending FrameArtist? = nil,
+        stallTimeout: Duration? = nil,
         outputURL: URL,
         fileType: AVFileType
     ) async throws {
         precondition(!videoOutputSettings.isEmpty)
+
+        self.stallTimeout = stallTimeout
 
         (progressStream, progressContinuation) = AsyncStream<Float>.makeStream()
 
@@ -75,11 +101,13 @@ actor SampleWriter {
             reader.timeRange = timeRange
         }
         self.reader = reader
+        statuses.reader = reader
 
         let writer = try AVAssetWriter(outputURL: outputURL, fileType: fileType)
         writer.shouldOptimizeForNetworkUse = optimizeForNetworkUse
         writer.metadata = metadata
         self.writer = writer
+        statuses.writer = writer
 
         self.audioMix = audioMix
         self.videoOutputSettings = videoOutputSettings
@@ -163,25 +191,25 @@ actor SampleWriter {
         self.videoInput = videoInput
     }
 
-    func writeSamples() async throws {
+    /// Writes every sample, then finishes the file.
+    ///
+    /// The wait for the samples happens off the actor. Reading a sample blocks the actor's queue
+    /// until one is ready, so a wait on the actor couldn't notice a cancelled task, or a read
+    /// that never returns, until the read came back.
+    nonisolated func writeSamples() async throws {
+        try await start()
+        do {
+            try await waitForSamples()
+        } catch {
+            await abandonSoon()
+            throw error
+        }
+        try await finish()
+    }
+
+    private func start() throws {
         guard let reader, let writer else { throw CancellationError() }
         try Task.checkCancellation()
-
-        // Clear all of these properties otherwise when we get cancelled then we leak a bunch of
-        // pixel buffers.
-        defer {
-            if Task.isCancelled {
-                reader.cancelReading()
-                writer.cancelWriting()
-            }
-            self.reader = nil
-            self.writer = nil
-            audioInput = nil
-            audioOutput = nil
-            videoInput = nil
-            videoOutput = nil
-            videoFrames = nil
-        }
 
         progressContinuation.yield(0.0)
 
@@ -189,23 +217,39 @@ actor SampleWriter {
         writer.startSession(atSourceTime: timeRange.start)
         reader.startReading()
 
-        try Task.checkCancellation()
+        do {
+            try Task.checkCancellation()
+        } catch {
+            abandon()
+            throw error
+        }
 
+        pace.withLock { $0.lastSample = .now }
         startEncodingAudioTracks()
         startEncodingVideoTracks()
+    }
 
+    private nonisolated func waitForSamples() async throws {
         // The reader completes once it's handed over its last frame, which can still have
         // output frames left to fill, so this waits for the inputs instead.
-        while !(isAudioFinished && isVideoFinished),
-              reader.status == .reading || reader.status == .completed,
-              writer.status == .writing
-        {
+        while statuses.isUnderWay {
+            let pace = pace.withLock { $0 }
+            guard !pace.areInputsFinished else { break }
+
+            if let stallTimeout, SuspendingClock.now - pace.lastSample > stallTimeout {
+                throw Error.stalled
+            }
             try await Task.sleep(for: .milliseconds(10))
         }
 
         // The inputs can finish before the sleep above notices a cancellation, so check again
         // rather than finishing a cancelled export.
         try Task.checkCancellation()
+    }
+
+    private func finish() async throws {
+        guard let reader, let writer else { throw CancellationError() }
+        defer { releaseEverything() }
 
         if let videoFrameError {
             writer.cancelWriting()
@@ -234,6 +278,45 @@ actor SampleWriter {
                 continuation.resume(returning: ())
             }
             progressContinuation.finish()
+        }
+    }
+
+    /// Stops a cancelled or stalled export, waiting a moment for that to happen so the output
+    /// file is gone by the time the caller hears about it. When the actor's queue is stuck in a
+    /// read that never returns the export is left behind, still stuck.
+    private nonisolated func abandonSoon() async {
+        Task { await self.abandon() }
+        let deadline = SuspendingClock.now + .seconds(1)
+        while !pace.withLock({ $0.isAbandoned }), SuspendingClock.now < deadline {
+            await Task.yield()
+        }
+    }
+
+    private func abandon() {
+        reader?.cancelReading()
+        writer?.cancelWriting()
+        releaseEverything()
+        pace.withLock { $0.isAbandoned = true }
+    }
+
+    /// Clears all of these properties, otherwise a cancelled export leaks a bunch of pixel
+    /// buffers.
+    private func releaseEverything() {
+        reader = nil
+        writer = nil
+        audioInput = nil
+        audioOutput = nil
+        videoInput = nil
+        videoOutput = nil
+        videoFrames = nil
+    }
+
+    /// Tells ``writeSamples()`` how the samples are coming along.
+    private func notePace(wroteSample: Bool) {
+        let areInputsFinished = isAudioFinished && isVideoFinished
+        pace.withLock {
+            if wroteSample { $0.lastSample = .now }
+            $0.areInputsFinished = areInputsFinished
         }
     }
 
@@ -277,6 +360,7 @@ actor SampleWriter {
             }
             if isVideoFinished { log.debug("Finished encoding video") }
         }
+        notePace(wroteSample: false)
     }
 
     /// Appends samples until the input is full. False once there are no more to append.
@@ -326,6 +410,7 @@ actor SampleWriter {
             """)
             return false
         }
+        notePace(wroteSample: true)
         return true
     }
 

@@ -44,6 +44,8 @@ extension ExportSession {
         case setupFailure(SetupFailureReason)
         case readFailure((any Swift.Error)?)
         case writeFailure((any Swift.Error)?)
+        /// No sample was written for as long as the session's ``ExportSession/stallTimeout``.
+        case stalled
 
         public var errorDescription: String? {
             switch self {
@@ -53,6 +55,8 @@ extension ExportSession {
                 underlyingError?.localizedDescription ?? "Unknown read failure"
             case let .writeFailure(underlyingError):
                 underlyingError?.localizedDescription ?? "Unknown write failure"
+            case .stalled:
+                "The export stopped making progress"
             }
         }
 
@@ -64,6 +68,8 @@ extension ExportSession {
                 String(describing: lhsError) == String(describing: rhsError)
             case let (.writeFailure(lhsError), .writeFailure(rhsError)):
                 String(describing: lhsError) == String(describing: rhsError)
+            case (.stalled, .stalled):
+                true
             default:
                 false
             }

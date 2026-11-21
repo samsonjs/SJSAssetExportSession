@@ -12,7 +12,12 @@ public final class ExportSession: Sendable {
 
     private let progressContinuation: AsyncStream<Float>.Continuation
 
-    public init() {
+    /// How long an export can go without writing a sample before it gives up and throws
+    /// ``Error/stalled``, or `nil` to wait forever. Time the device spends asleep doesn't count.
+    public let stallTimeout: Duration?
+
+    public init(stallTimeout: Duration? = .seconds(60)) {
+        self.stallTimeout = stallTimeout
         (progressStream, progressContinuation) = AsyncStream<Float>.makeStream()
     }
 
@@ -68,6 +73,7 @@ public final class ExportSession: Sendable {
             optimizeForNetworkUse: optimizeForNetworkUse,
             metadata: metadata,
             drawFrame: drawFrame,
+            stallTimeout: stallTimeout,
             outputURL: outputURL,
             fileType: fileType
         )
@@ -151,6 +157,7 @@ public final class ExportSession: Sendable {
             optimizeForNetworkUse: optimizeForNetworkUse,
             metadata: metadata,
             drawFrame: drawFrame,
+            stallTimeout: stallTimeout,
             outputURL: outputURL,
             fileType: fileType
         )
