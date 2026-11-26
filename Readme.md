@@ -260,6 +260,6 @@ The package in [Benchmarks](Benchmarks) measures how much CPU time and memory ex
 
 ## License
 
-Copyright © 2024-2025 [Sami Samhuri](https://samhuri.net) <sami@samhuri.net>. Released under the terms of the [MIT License][MIT].
+Copyright © 2024-2026 [Sami Samhuri](https://samhuri.net) <sami@samhuri.net>. Released under the terms of the [MIT License][MIT].
 
 [MIT]: https://sjs.mit-license.org
