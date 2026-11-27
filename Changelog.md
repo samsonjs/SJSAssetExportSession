@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Added/Changed/Fixed
+- Your change here.
+
+[Unreleased]: https://git.samhuri.net/sjs/SJSAssetExportSession/compare/0.7.0...HEAD
+
+## [0.7.0] - 2026-11-27
+
 ### Added
 - Passing `nil` for `audioOutputSettings` copies every audio track without decoding it, as `AVAssetWriterInput` does with `nil` settings, so the output keeps each track's format, channels, sample rate and bitrate. Disabled tracks are copied too, such as the spatial audio (APAC) track iPhones record beside a stereo AAC one. Tracks keep whether they're enabled and their language. Tracks the source groups as alternates, or links with an audio fallback association, are grouped as alternates in the output, and the association is kept. Timed metadata tracks that describe a copied audio track, such as the `com.apple.quicktime.cinematic-audio` track iPhones write for their spatial audio track, are copied with it. An audio mix can't be used with it and throws `setupFailure(.audioSettingsInvalid)`.
 
@@ -12,7 +19,7 @@
 ### Fixed
 - Fixed exports crashing when the audio settings have no sample rate, such as `audio: .format(.aac)` without `.sampleRate(_:)` or raw audio settings without `AVSampleRateKey`. They now use the source's sample rate.
 
-[Unreleased]: https://git.samhuri.net/sjs/SJSAssetExportSession/compare/0.6.0...HEAD
+[0.7.0]: https://git.samhuri.net/sjs/SJSAssetExportSession/compare/0.6.0...0.7.0
 
 ## [0.6.0] - 2026-11-15
 
