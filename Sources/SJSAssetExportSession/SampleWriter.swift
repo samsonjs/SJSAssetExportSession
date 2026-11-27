@@ -106,7 +106,7 @@ actor SampleWriter {
                     audioSettings: Self.audioMixSettings(matching: audioOutputSettings)
                 )
                 audioOutput.alwaysCopiesSampleData = false
-                audioOutput.audioMix = audioMix
+                audioOutput.audioMix = audioMix?.withoutVarispeed()
                 guard reader.canAdd(audioOutput) else {
                     throw Error.setupFailure(.cannotAddAudioOutput)
                 }

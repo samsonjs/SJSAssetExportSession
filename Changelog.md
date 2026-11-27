@@ -2,8 +2,8 @@
 
 ## [Unreleased]
 
-### Added/Changed/Fixed
-- Your change here.
+### Fixed
+- Fixed exports never finishing for a short cut of slo-mo audio. Photos hands over a slo-mo video with an audio mix that sets `.varispeed`, and exporting a cut of a second or less from the slowed part with that mix hung without returning or throwing. A mix's `.varispeed` is now ignored and AVFoundation's default time pitch algorithm is used for that track, so every export of time-scaled audio with such a mix sounds different than before, not only the short cuts.
 
 [Unreleased]: https://git.samhuri.net/sjs/SJSAssetExportSession/compare/0.7.0...HEAD
 

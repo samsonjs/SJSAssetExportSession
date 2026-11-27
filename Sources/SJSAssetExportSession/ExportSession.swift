@@ -30,7 +30,7 @@ public final class ExportSession: Sendable {
 
        - audio: Optional audio settings using ``AudioOutputSettings``. Defaults to ``AudioOutputSettings/default``.
 
-       - mix: An optional mix that can be used to manipulate the audio in some way.
+       - mix: An optional mix that can be used to manipulate the audio in some way. A track's `.varispeed` time pitch algorithm is ignored and AVFoundation's default is used for that track instead, because reading a short cut of time-scaled audio with varispeed never finishes.
 
        - video: Video settings using ``VideoOutputSettings``.
 
@@ -99,7 +99,7 @@ public final class ExportSession: Sendable {
 
          With `nil`, as with `AVAssetWriterInput`, every audio track is copied without being decoded or encoded again, disabled tracks included, so the output keeps each track's format, channels, sample rate and bitrate. Tracks keep whether they're enabled and their language. Tracks the source groups as alternates, or links with an audio fallback association, are grouped as alternates in the output, and the association is kept. Timed metadata tracks that describe a copied audio track are copied too, such as the `com.apple.quicktime.cinematic-audio` track iPhones write for their spatial audio track. The `fileType` has to be able to hold each track's format, or the export throws ``ExportSession/Error/setupFailure(_:)`` with ``ExportSession/SetupFailureReason/cannotAddAudioInput``.
 
-       - mix: An optional mix that can be used to manipulate the audio in some way. A mix can't be used when `audioOutputSettings` is `nil`, and the export throws ``ExportSession/Error/setupFailure(_:)`` with ``ExportSession/SetupFailureReason/audioSettingsInvalid`` if one is given.
+       - mix: An optional mix that can be used to manipulate the audio in some way. A track's `.varispeed` time pitch algorithm is ignored and AVFoundation's default is used for that track instead, because reading a short cut of time-scaled audio with varispeed never finishes. A mix can't be used when `audioOutputSettings` is `nil`, and the export throws ``ExportSession/Error/setupFailure(_:)`` with ``ExportSession/SetupFailureReason/audioSettingsInvalid`` if one is given.
 
        - videoOutputSettings: Video settings using [video settings keys from AVFoundation](https://developer.apple.com/documentation/avfoundation/video_settings) and values must be suitable for consumption by Objective-C. Required keys are:
           - `AVVideoCodecKey` with the typical value `AVVideoCodecType.h264.rawValue` or `AVVideoCodecType.hevc.rawValue`
