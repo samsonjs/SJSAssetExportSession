@@ -33,7 +33,7 @@ actor SampleWriter {
 
     // MARK: Inputs
 
-    private let audioOutputSettings: [String: any Sendable]
+    private let audioOutputSettings: [String: any Sendable]?
     private let audioMix: AVAudioMix?
     private let videoOutputSettings: [String: any Sendable]
     private let videoComposition: AVVideoComposition?
@@ -43,18 +43,18 @@ actor SampleWriter {
 
     private var reader: AVAssetReader?
     private var writer: AVAssetWriter?
-    private var audioOutput: AVAssetReaderAudioMixOutput?
-    private var audioInput: AVAssetWriterInput?
+    /// The audio, and with passthrough the metadata that describes it, each written to its own input.
+    private var audioLanes: [Lane] = []
     private var videoOutput: AVAssetReaderVideoCompositionOutput?
     private var videoInput: AVAssetWriterInput?
     private var videoFrames: VideoFrameSource?
     private var videoFrameError: (any Swift.Error)?
-    private var isAudioFinished = true
+    private var isAudioFinished: Bool { audioLanes.allSatisfy(\.isFinished) }
     private var isVideoFinished = false
 
     nonisolated init(
         asset: sending AVAsset,
-        audioOutputSettings: sending [String: any Sendable],
+        audioOutputSettings: sending [String: any Sendable]?,
         audioMix: sending AVAudioMix?,
         videoOutputSettings: sending [String: any Sendable],
         videoComposition: sending AVVideoComposition,
@@ -91,35 +91,40 @@ actor SampleWriter {
         }
         self.timeRange = timeRange
 
-        // Filter out disabled tracks to avoid problems encoding spatial audio. Ideally this would
-        // preserve track groups and make that all configurable.
-        let audioTracks = try await asset.loadTracks(withMediaType: .audio)
-            .filterAsync { try await $0.load(.isEnabled) }
-        let audioOutputSettings = try await Self.withSourceSampleRate(audioOutputSettings, from: audioTracks)
-        self.audioOutputSettings = audioOutputSettings
-        // Audio is optional so only validate output settings when it's applicable.
-        if !audioTracks.isEmpty {
-            try Self.validateAudio(outputSettings: audioOutputSettings, writer: writer)
-            let audioOutput = AVAssetReaderAudioMixOutput(
-                audioTracks: audioTracks,
-                audioSettings: Self.audioMixSettings(matching: audioOutputSettings)
-            )
-            audioOutput.alwaysCopiesSampleData = false
-            audioOutput.audioMix = audioMix
-            guard reader.canAdd(audioOutput) else {
-                throw Error.setupFailure(.cannotAddAudioOutput)
-            }
-            reader.add(audioOutput)
-            self.audioOutput = audioOutput
+        if let audioOutputSettings {
+            // Filter out disabled tracks to avoid problems encoding spatial audio. Ideally this would
+            // preserve track groups and make that all configurable.
+            let audioTracks = try await asset.loadTracks(withMediaType: .audio)
+                .filterAsync { try await $0.load(.isEnabled) }
+            let audioOutputSettings = try await Self.withSourceSampleRate(audioOutputSettings, from: audioTracks)
+            self.audioOutputSettings = audioOutputSettings
+            // Audio is optional so only validate output settings when it's applicable.
+            if !audioTracks.isEmpty {
+                try Self.validateAudio(outputSettings: audioOutputSettings, writer: writer)
+                let audioOutput = AVAssetReaderAudioMixOutput(
+                    audioTracks: audioTracks,
+                    audioSettings: Self.audioMixSettings(matching: audioOutputSettings)
+                )
+                audioOutput.alwaysCopiesSampleData = false
+                audioOutput.audioMix = audioMix
+                guard reader.canAdd(audioOutput) else {
+                    throw Error.setupFailure(.cannotAddAudioOutput)
+                }
+                reader.add(audioOutput)
 
-            let audioInput = AVAssetWriterInput(mediaType: .audio, outputSettings: audioOutputSettings)
-            audioInput.expectsMediaDataInRealTime = false
-            guard writer.canAdd(audioInput) else {
-                throw Error.setupFailure(.cannotAddAudioInput)
+                let audioInput = AVAssetWriterInput(mediaType: .audio, outputSettings: audioOutputSettings)
+                audioInput.expectsMediaDataInRealTime = false
+                guard writer.canAdd(audioInput) else {
+                    throw Error.setupFailure(.cannotAddAudioInput)
+                }
+                writer.add(audioInput)
+                audioLanes = [Lane(output: audioOutput, input: audioInput)]
             }
-            writer.add(audioInput)
-            self.audioInput = audioInput
-            isAudioFinished = false
+        } else {
+            // A mix changes the sound, which takes decoding it.
+            guard audioMix == nil else { throw Error.setupFailure(.audioSettingsInvalid) }
+            self.audioOutputSettings = nil
+            audioLanes = try await AudioPassthrough.addLanes(from: asset, to: reader, and: writer)
         }
 
         let videoTracks = try await asset.loadTracks(withMediaType: .video)
@@ -176,8 +181,7 @@ actor SampleWriter {
             }
             self.reader = nil
             self.writer = nil
-            audioInput = nil
-            audioOutput = nil
+            audioLanes = []
             videoInput = nil
             videoOutput = nil
             videoFrames = nil
@@ -240,13 +244,10 @@ actor SampleWriter {
     // MARK: - Encoding
 
     private func startEncodingAudioTracks() {
-        // Don't do anything when we have no audio to encode.
-        guard let audioInput, audioOutput != nil else {
-            return
-        }
-
-        audioInput.requestMediaDataWhenReady(on: queue) {
-            Task { await self.writeAllReadySamples() }
+        for lane in audioLanes {
+            lane.input.requestMediaDataWhenReady(on: queue) {
+                Task { await self.writeAllReadySamples() }
+            }
         }
     }
 
@@ -257,9 +258,9 @@ actor SampleWriter {
     }
 
     private func writeAllReadySamples() {
-        if let audioInput, let audioOutput, !isAudioFinished {
-            isAudioFinished = !writeReadySamples(to: audioInput) {
-                audioOutput.copyNextSampleBuffer()
+        for lane in audioLanes where !lane.isFinished {
+            lane.isFinished = !writeReadySamples(to: lane.input) {
+                lane.output.copyNextSampleBuffer()
             }
             if isAudioFinished { log.debug("Finished encoding audio") }
         }

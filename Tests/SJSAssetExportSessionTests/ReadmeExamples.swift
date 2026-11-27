@@ -115,6 +115,25 @@ private func readmeFlexibleExample() async throws {
     )
 }
 
+private func readmeCopyingAudioExample() async throws {
+    let sourceURL = URL.documentsDirectory.appending(component: "some-video.mov")
+    let sourceAsset = AVURLAsset(url: sourceURL, options: [
+        AVURLAssetPreferPreciseDurationAndTimingKey: true,
+    ])
+    let destinationURL = URL.temporaryDirectory.appending(component: "shiny-new-video.mp4")
+    let exporter = ExportSession()
+
+    try await exporter.export(
+        asset: sourceAsset,
+        audioOutputSettings: nil,
+        videoOutputSettings: VideoOutputSettings
+            .codec(.hevc, width: 1920, height: 1080)
+            .settingsDictionary,
+        to: destinationURL,
+        as: .mp4
+    )
+}
+
 private func readmeMixAndMatchExample() async throws {
     let sourceURL = URL.documentsDirectory.appending(component: "some-video.mov")
     let sourceAsset = AVURLAsset(url: sourceURL, options: [

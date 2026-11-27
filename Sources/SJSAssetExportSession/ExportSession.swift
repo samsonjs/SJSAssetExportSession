@@ -97,7 +97,9 @@ public final class ExportSession: Sendable {
 
          Without `AVSampleRateKey` the export uses the sample rate of the source's audio tracks, or 44.1 kHz when they have different rates, lowered to the nearest rate the format can encode when it can't encode that one.
 
-       - mix: An optional mix that can be used to manipulate the audio in some way.
+         With `nil`, as with `AVAssetWriterInput`, every audio track is copied without being decoded or encoded again, disabled tracks included, so the output keeps each track's format, channels, sample rate and bitrate. Tracks keep whether they're enabled and their language. Tracks the source groups as alternates, or links with an audio fallback association, are grouped as alternates in the output, and the association is kept. Timed metadata tracks that describe a copied audio track are copied too, such as the `com.apple.quicktime.cinematic-audio` track iPhones write for their spatial audio track. The `fileType` has to be able to hold each track's format, or the export throws ``ExportSession/Error/setupFailure(_:)`` with ``ExportSession/SetupFailureReason/cannotAddAudioInput``.
+
+       - mix: An optional mix that can be used to manipulate the audio in some way. A mix can't be used when `audioOutputSettings` is `nil`, and the export throws ``ExportSession/Error/setupFailure(_:)`` with ``ExportSession/SetupFailureReason/audioSettingsInvalid`` if one is given.
 
        - videoOutputSettings: Video settings using [video settings keys from AVFoundation](https://developer.apple.com/documentation/avfoundation/video_settings) and values must be suitable for consumption by Objective-C. Required keys are:
           - `AVVideoCodecKey` with the typical value `AVVideoCodecType.h264.rawValue` or `AVVideoCodecType.hevc.rawValue`
@@ -119,7 +121,7 @@ public final class ExportSession: Sendable {
         optimizeForNetworkUse: Bool = false,
         metadata: sending [AVMetadataItem] = [],
         timeRange: CMTimeRange? = nil,
-        audioOutputSettings: [String: any Sendable],
+        audioOutputSettings: [String: any Sendable]?,
         mix: sending AVAudioMix? = nil,
         videoOutputSettings: [String: any Sendable],
         composition: sending AVVideoComposition? = nil,

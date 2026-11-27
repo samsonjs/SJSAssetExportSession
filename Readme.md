@@ -165,6 +165,22 @@ try await exporter.export(
 
 It's an effective illustration of why the nicer API exists right? But when you need this flexibility then it's available for you.
 
+### Copying Audio As It Is
+
+Pass `nil` for `audioOutputSettings` to copy every audio track across without decoding or encoding it again, while the video is encoded with your settings. Each track keeps its format, channels, sample rate and bitrate, so the spatial audio track an iPhone records next to its stereo track comes along, as do LPCM and surround tracks. Alternate groups, audio fallback associations and the metadata tracks that describe the audio are kept too. The file type has to be able to hold the tracks' formats, and an audio mix can't be used.
+
+```swift
+try await exporter.export(
+    asset: sourceAsset,
+    audioOutputSettings: nil,
+    videoOutputSettings: VideoOutputSettings
+        .codec(.hevc, width: 1920, height: 1080)
+        .settingsDictionary,
+    to: destinationURL,
+    as: .mp4
+)
+```
+
 ### Mix and Match
 
 `AudioOutputSettings` and `VideoOutputSettings` have a property named `settingsDictionary` and you can use that to bootstrap your own custom settings.
